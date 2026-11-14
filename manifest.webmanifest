@@ -1,0 +1,11 @@
+{
+  "name": "Το Πάρκινγκ μου",
+  "short_name": "Πάρκινγκ",
+  "description": "Αποθήκευση θέσης αυτοκινήτου τοπικά",
+  "lang": "el",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101b2b",
+  "theme_color": "#101b2b"
+}
