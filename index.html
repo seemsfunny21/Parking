@@ -1,168 +1,434 @@
-<!doctype html><html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101b2b"><meta name="description" content="Τοπική αποθήκευση θέσης στάθμευσης"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" type="image/svg+xml" href="./icon.svg"><title>Το Πάρκινγκ μου</title><style>:root{font-family:system-ui,sans-serif;color-scheme:dark;background:#101b2b;color:#f7fafc}*{box-sizing:border-box}body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:20px}.app{width:min(100%,480px)}header{text-align:center;margin-bottom:24px}h1{font-size:1.8rem;margin:12px 0 4px}header p,.muted{color:#aab9ce}.panel{background:#1a2a40;border:1px solid #31445e;border-radius:20px;padding:24px;text-align:center}.status{display:inline-block;background:#27445d;border-radius:30px;padding:7px 14px;font-size:.9rem;margin-bottom:14px}.position{font-size:1.12rem;font-weight:700;overflow-wrap:anywhere}.date{font-size:.9rem;color:#b6c6d9;margin-top:9px}.actions{display:grid;gap:12px;margin-top:18px}button{cursor:pointer;width:100%;padding:17px;border:0;border-radius:14px;font-weight:750;font-size:1rem;color:white;background:#2673ed}button.secondary{background:#253e5b;border:1px solid #48617d}button:disabled{opacity:.5;cursor:not-allowed}button[hidden]{display:none}.note{font-size:.76rem;color:#859ab4;text-align:center;line-height:1.5;margin-top:18px}
-#message{color:#d9e8fa;text-align:center;font-size:.85rem;margin-top:9px}
-#message:empty{display:none}
-#capture-status{color:#a8f2cb;text-align:center;font-size:.91rem;font-weight:650;margin-top:12px}
-#capture-status:empty{display:none}
-.gps-progress{display:flex;align-items:center;justify-content:center;gap:13px;margin:18px 0 2px;color:#b8cce5;font-size:.9rem;font-weight:600}
-.gps-progress[hidden]{display:none}
-.gps-ring{width:66px;height:66px;display:grid;place-items:center;border-radius:50%;padding:5px;background:conic-gradient(#65dfb0 0deg,#2a435e 0deg)}
-.gps-inner{width:100%;height:100%;display:grid;place-items:center;border-radius:50%;background:#101b2b;font-size:1.4rem;font-weight:800;color:#f7fafc;font-variant-numeric:tabular-nums}
-@media(prefers-reduced-motion:reduce){.gps-ring{transition:none}}</style></head><body><main class="app"><header><div aria-hidden="true" style="font-size:3rem">🚗</div><h1>Το Πάρκινγκ μου</h1></header><section class="panel" aria-live="polite"><div class="status" id="status">Δεν υπάρχει αποθηκευμένη θέση</div><div class="position" id="position">Πάτησε «Αποθήκευση θέσης» όταν παρκάρεις.</div><div class="date" id="date"></div></section><div class="actions"><button id="save">📍 Αποθήκευση θέσης</button><button class="secondary" id="retry" hidden>↻ Επανάληψη εύρεσης οδού</button><button class="secondary" id="map" disabled>🗺️ Προβολή χάρτη</button><button class="secondary" id="navigate" disabled>➤ Πλοήγηση στο αυτοκίνητο</button></div><div class="gps-progress" id="gps-progress" hidden><div class="gps-ring" id="gps-ring"><div class="gps-inner" id="gps-seconds">5</div></div><span>Εντοπισμός θέσης…</span></div><div id="capture-status" role="status" aria-live="polite"></div><div id="message" role="status" aria-live="polite"></div><p class="note">Η θέση μένει στο κινητό. Η εύρεση οδού γίνεται online (© OpenStreetMap contributors).</p></main><script>(()=>{'use strict';const KEY='parking.saved.v1',$=id=>document.getElementById(id);let saved=null;try{const raw=localStorage.getItem(KEY);if(raw){const v=JSON.parse(raw);if(Number.isFinite(v.lat)&&Number.isFinite(v.lon)&&Number.isFinite(v.timestamp)&&Math.abs(v.lat)<=90&&Math.abs(v.lon)<=180)saved=v}}catch(e){$('message').textContent='Αδυναμία ανάγνωσης προηγούμενης θέσης.'}function render(){
-  $('map').disabled=$('navigate').disabled=!saved;
-  const unresolved=!!saved && !saved.address;
-  $('retry').hidden=!saved || !saved.addressLookedUp || !unresolved;
-  $('retry').disabled=lookingUp;
-  if(saved){
-    $('status').textContent='✓ Αποθηκευμένη θέση';
-    $('position').textContent=saved.address || (lookingUp?'Εύρεση οδού…':(saved.addressLookedUp?'Άγνωστη οδός':'Η θέση έχει αποθηκευτεί'));
-    $('date').textContent=new Intl.DateTimeFormat('el-GR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(saved.timestamp));
-  }else{
-    $('status').textContent='Δεν υπάρχει αποθηκευμένη θέση';
-    $('position').textContent='Πάτησε «Αποθήκευση θέσης».';
-    $('date').textContent='';
-  }
-}
-function stillCurrent(record){
- return saved && saved.timestamp===record.timestamp && saved.lat===record.lat && saved.lon===record.lon;
-}
-function streetLabel(road,house,city,record){
-  if(!road)return '';
-  const precise=Number.isFinite(record.accuracy)&&record.accuracy<=40;
-  return 'Πιθανή οδός: '+road+(precise&&house?' '+house:'')+(city?', '+city:'');
-}
-function photonLabel(data,record){
-  const features=Array.isArray(data?.features)?data.features:[];
-  const match=features.find(f=>f?.properties && typeof f.properties.street==='string' && f.properties.street.trim()) ||
-    features.find(f=>f?.properties?.osm_key==='highway' && typeof f.properties.name==='string' && f.properties.name.trim());
-  const p=match?.properties||{};
-  const road=String(p.street || (p.osm_key==='highway'?p.name:'') || '').trim();
-  return streetLabel(road,String(p.housenumber||'').trim(),String(p.city||p.locality||p.district||'').trim(),record);
-}
-function nominatimLabel(data,record){
-  const a=data?.address||{};
-  const road=String(a.road||a.pedestrian||a.residential||a.living_street||a.footway||a.path||'').trim();
-  return streetLabel(road,String(a.house_number||'').trim(),String(a.city||a.town||a.village||a.municipality||'').trim(),record);
-}
-async function requestJson(url,timeout=9000){
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),timeout);
-  try{
-    const response=await fetch(url,{signal:controller.signal,cache:'no-store'});
-    if(!response.ok)throw new Error('HTTP '+response.status);
-    return await response.json();
-  }finally{clearTimeout(timer)}
-}
-let lookingUp=false;
-async function resolveAddress(record){
-  if(!record || record.addressLookedUp || lookingUp)return;
-  if(!navigator.onLine){
-    $('message').textContent='Εκτός σύνδεσης: η αποθηκευμένη θέση είναι διαθέσιμη.';
-    return;
-  }
-  lookingUp=true;render();
-  $('message').textContent='';
-  let address='';
-  try{
-    const url='https://photon.komoot.io/reverse?lat='+encodeURIComponent(record.lat)+'&lon='+encodeURIComponent(record.lon)+'&lang=el&limit=5';
-    address=photonLabel(await requestJson(url,8000),record);
-  }catch(error){/* Try second provider if Photon fails or times out. */}
-  if(!address){
-    try{
-      const url='https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&accept-language=el&lat='+
-        encodeURIComponent(record.lat)+'&lon='+encodeURIComponent(record.lon);
-      address=nominatimLabel(await requestJson(url,10000),record);
-    }catch(error){/* Keep GPS coordinates if both services fail. */}
-  }
-  lookingUp=false;
-  if(stillCurrent(record)){
-    saved.address=address;
-    saved.addressLookedUp=true; // Prevent automatic repeated queries on every launch.
-    try{localStorage.setItem(KEY,JSON.stringify(saved))}catch(error){}
-    render();
-    $('message').textContent=address?
-      '':
-      'Δεν βρέθηκε οδός — δοκίμασε ξανά.';
-  }else if(saved && !saved.addressLookedUp){
-    resolveAddress(saved);
-  }
-}
-render();
-if(saved && !saved.addressLookedUp)resolveAddress(saved);
-$('retry').addEventListener('click',()=>{
-  if(!saved || lookingUp)return;
-  saved.addressLookedUp=false;
-  resolveAddress(saved);
-});
-$('save').addEventListener('click',()=>{
-  if(!isSecureContext){$('capture-status').textContent='Το GPS απαιτεί HTTPS.';return}
-  if(!navigator.geolocation){$('capture-status').textContent='Δεν υποστηρίζεται το GPS.';return}
-  const button=$('save'),progress=$('gps-progress'),ring=$('gps-ring'),seconds=$('gps-seconds');
-  button.disabled=true;
-  $('capture-status').textContent='';
-  $('message').textContent='';
-  progress.hidden=false;
-  const start=performance.now();
-  let best=null,finished=false,watchId=null,timer=null,animationId=null;
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#081629">
+  <meta name="description" content="Το Πάρκινγκ μου - εύκολη αποθήκευση θέσης αυτοκινήτου">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="./icon.svg">
+  <title>Το Πάρκινγκ μου</title>
+  <style>
+    :root{
+      --bg:#071426;
+      --bg2:#0a1d35;
+      --panel:rgba(18,39,67,.84);
+      --panel-2:rgba(20,48,84,.92);
+      --edge:rgba(116,165,255,.24);
+      --edge-strong:rgba(90,160,255,.48);
+      --text:#f6fbff;
+      --sub:#aec6e6;
+      --blue:#1a7dff;
+      --blue2:#34a0ff;
+      --green:#1fba72;
+      --green2:#3ae091;
+      --shadow:0 20px 50px rgba(0,0,0,.34);
+      --radius:24px;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      color-scheme:dark;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:
+      radial-gradient(circle at 50% 8%, rgba(42,112,255,.18), transparent 26%),
+      radial-gradient(circle at 50% 100%, rgba(12,85,255,.15), transparent 30%),
+      linear-gradient(180deg,#04101d 0%, #081629 38%, #071426 100%);
+      color:var(--text);
+    }
+    body{padding:20px 16px 28px}
+    .app{max-width:430px;margin:0 auto}
+    .hero{text-align:center;padding-top:4px;margin-bottom:18px}
+    .car-glow{
+      width:120px;height:74px;margin:6px auto 10px;position:relative;
+      display:grid;place-items:center;
+    }
+    .car-glow::before{
+      content:"";position:absolute;inset:auto 10px 8px;height:18px;border-radius:999px;
+      background:radial-gradient(circle at center, rgba(50,160,255,.85), rgba(50,160,255,.18) 55%, transparent 72%);
+      filter:blur(2px);
+    }
+    .car-emoji{font-size:3.4rem;position:relative;z-index:1;filter:drop-shadow(0 0 10px rgba(58,148,255,.35));}
+    h1{margin:0;font-size:2.65rem;line-height:1.05;font-weight:800;letter-spacing:-.02em}
+    .subtitle{margin:10px auto 0;max-width:340px;color:var(--sub);font-size:1.02rem;line-height:1.4}
 
-  function animate(now){
-    if(finished)return;
-    const elapsed=Math.max(0,Math.min(5000,now-start));
-    const angle=elapsed/5000*360;
-    ring.style.background='conic-gradient(#65dfb0 '+angle+'deg,#2a435e '+angle+'deg)';
-    seconds.textContent=String(Math.max(1,Math.ceil((5000-elapsed)/1000)));
-    animationId=requestAnimationFrame(animate);
-  }
-  seconds.textContent='5';
-  ring.style.background='conic-gradient(#65dfb0 0deg,#2a435e 0deg)';
-  animationId=requestAnimationFrame(animate);
-  function stop(){
-    if(finished)return false;
-    finished=true;
-    clearTimeout(timer);
-    cancelAnimationFrame(animationId);
-    if(watchId!==null)navigator.geolocation.clearWatch(watchId);
-    progress.hidden=true;
-    button.disabled=false;
-    return true;
-  }
-  function finish(){
-    if(!stop())return;
-    if(!best){
-      $('capture-status').textContent='Δεν βρέθηκε θέση. Η προηγούμενη παραμένει.';
-      return;
+    .panel{
+      background:linear-gradient(180deg, rgba(18,37,64,.95), rgba(12,29,52,.88));
+      border:1px solid var(--edge);
+      border-radius:28px;
+      box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.03);
+      padding:18px 18px 16px;
+      position:relative;overflow:hidden;
+      backdrop-filter:blur(10px);
     }
-    const value={lat:best.lat,lon:best.lon,accuracy:best.accuracy,timestamp:Date.now(),address:'',addressLookedUp:false};
+    .panel::after{
+      content:"";position:absolute;right:-20px;bottom:-28px;width:210px;height:140px;opacity:.34;
+      background:
+        linear-gradient(125deg, transparent 0 28%, rgba(86,140,230,.9) 28% 30%, transparent 30% 48%, rgba(86,140,230,.9) 48% 50%, transparent 50% 68%, rgba(86,140,230,.9) 68% 70%, transparent 70%),
+        radial-gradient(circle at 36% 56%, rgba(68,160,255,.95) 0 6px, rgba(68,160,255,.2) 7px 22px, transparent 23px);
+      transform:rotate(-6deg);
+      pointer-events:none;
+    }
+    .status-chip{
+      display:inline-flex;align-items:center;gap:10px;
+      padding:10px 18px;border-radius:999px;
+      background:linear-gradient(180deg, rgba(23,152,87,.92), rgba(18,129,72,.92));
+      box-shadow:inset 0 0 0 1px rgba(96,255,168,.28), 0 10px 28px rgba(0,0,0,.22);
+      font-weight:760;font-size:1rem;
+    }
+    .status-chip .check{font-size:1.7rem;line-height:1;margin-top:-2px}.status-chip.empty{background:linear-gradient(180deg,#294562,#1a344e);box-shadow:inset 0 0 0 1px rgba(130,170,215,.3)}
+    .place{display:flex;gap:14px;align-items:flex-start;margin:18px 0 12px;position:relative;z-index:1}
+    .pin{font-size:2.5rem;line-height:1;color:#3d8fff;filter:drop-shadow(0 0 10px rgba(63,143,255,.3))}
+    .place-name{font-size:1.85rem;line-height:1.08;font-weight:800;letter-spacing:-.03em;word-break:break-word}
+    .meta{display:flex;gap:16px;flex-wrap:wrap;color:#d6e6fa;font-size:1.05rem;position:relative;z-index:1}
+    .meta span{display:inline-flex;align-items:center;gap:8px;opacity:.96}
+    .meta i{font-style:normal;font-size:1.1rem}
+
+    .progress-block{display:grid;place-items:center;padding:20px 0 16px}.progress-block.idle{display:none}.big-progress[hidden]{display:none}
+    .progress-wrap{display:grid;place-items:center;gap:10px}
+    .big-progress{
+      width:164px;height:164px;border-radius:50%;display:grid;place-items:center;position:relative;
+      background:conic-gradient(var(--blue2) 0deg, rgba(74,123,191,.22) 0deg);
+      box-shadow:0 0 0 10px rgba(31,80,151,.18), 0 0 80px rgba(24,100,255,.16);
+    }
+    .big-progress::before{
+      content:"";position:absolute;inset:14px;border-radius:50%;
+      background:radial-gradient(circle at 50% 30%, #0e223d, #081629 70%);
+      box-shadow:inset 0 0 0 1px rgba(127,175,255,.12);
+    }
+    .big-progress-inner{position:relative;z-index:1;text-align:center}
+    .big-progress-top{font-size:1.35rem;line-height:1;margin-bottom:6px}
+    .big-progress-seconds{font-size:3.3rem;font-weight:820;line-height:1.02}
+    .progress-label{color:var(--sub);font-size:1.02rem;text-align:center;min-height:1.4em}
+    .progress-idle{display:none}
+
+    .actions{display:grid;gap:14px;margin-top:12px}
+    button{
+      width:100%;border:0;border-radius:24px;padding:0;cursor:pointer;color:var(--text);
+      font:inherit;transition:transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+    }
+    button:active{transform:translateY(1px)}
+    button:disabled{opacity:.56;cursor:not-allowed}
+    .primary-btn{
+      background:linear-gradient(180deg, #2f8dff, #136df0);
+      box-shadow:0 18px 42px rgba(3,34,92,.34), inset 0 0 0 1px rgba(180,221,255,.24);
+      min-height:92px;
+      display:grid;grid-template-columns:1fr 78px;align-items:stretch;overflow:hidden;
+    }
+    .primary-main{display:flex;align-items:center;justify-content:center;gap:14px;padding:0 18px;font-size:1.1rem;font-weight:800}
+    .primary-main .icon{font-size:2.1rem;line-height:1}
+    .mini-ring-wrap{
+      border-left:1px solid rgba(255,255,255,.15);display:grid;place-items:center;
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+    }
+    .mini-ring{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#94d8ff 0deg, rgba(255,255,255,.15) 0deg)}
+    .mini-ring::before{content:"";grid-area:1/1;width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,.2)}
+    .mini-ring span{grid-area:1/1;position:relative;z-index:1;font-weight:780;font-size:1.02rem}
+
+    .secondary{
+      background:linear-gradient(180deg, rgba(31,59,95,.96), rgba(21,43,72,.96));
+      border:1px solid rgba(122,164,226,.24);
+      min-height:76px;
+      box-shadow:0 14px 30px rgba(0,0,0,.22);
+      display:flex;align-items:center;justify-content:center;gap:16px;font-weight:780;font-size:1.02rem;
+    }
+    .secondary .icon{font-size:2rem;line-height:1}
+
+    .retry{background:transparent;color:var(--sub);border:1px dashed rgba(125,173,255,.24);min-height:54px;font-size:.95rem;display:none}
+    .retry.show{display:flex;align-items:center;justify-content:center}
+
+    .capture-status,.message{min-height:1.3em;text-align:center}
+    .capture-status{margin-top:16px;color:#b7f7d0;font-weight:700;font-size:.95rem}
+    .message{margin-top:6px;color:#b9cdec;font-size:.92rem}
+    .message:empty,.capture-status:empty{display:none}
+    .note{margin-top:16px;text-align:center;color:#7f98b9;font-size:.78rem;line-height:1.45}
+
+    @media (max-width:390px){
+      h1{font-size:2.22rem}
+      .place-name{font-size:1.62rem}
+      .meta{font-size:.97rem}
+      .primary-main{font-size:1.02rem}
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div class="car-glow"><div class="car-emoji" aria-hidden="true">🚗</div></div>
+      <h1>Το Πάρκινγκ μου</h1>
+      <p class="subtitle">Βρες εύκολα πού άφησες το αυτοκίνητο</p>
+    </header>
+
+    <section class="panel" aria-live="polite">
+      <div class="status-chip"><span class="check">✓</span><span id="status">Αποθηκευμένη θέση</span></div>
+      <div class="place">
+        <div class="pin" aria-hidden="true">📍</div>
+        <div class="place-name" id="position">Πάτησε «Αποθήκευση θέσης».</div>
+      </div>
+      <div class="meta">
+        <span><i>📅</i><span id="date">—</span></span>
+      </div>
+    </section>
+
+    <section class="progress-block idle" id="progress-block">
+      <div class="progress-wrap">
+        <div class="big-progress" id="big-progress" hidden>
+          <div class="big-progress-inner">
+            <div class="big-progress-top">📡</div>
+            <div class="big-progress-seconds" id="big-seconds">5</div>
+          </div>
+        </div>
+        <div class="progress-label" id="progress-label"></div>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button id="save" class="primary-btn" type="button">
+        <span class="primary-main"><span class="icon">📍</span><span id="save-label">Αποθήκευση θέσης</span></span>
+        <span class="mini-ring-wrap"><span class="mini-ring" id="mini-ring"><span id="mini-seconds">5s</span></span></span>
+      </button>
+      <button id="retry" class="retry" type="button">↻ Επανάληψη εύρεσης οδού</button>
+      <button id="map" class="secondary" type="button" disabled><span class="icon">🗺️</span><span>Προβολή χάρτη</span></button>
+      <button id="navigate" class="secondary" type="button" disabled><span class="icon">➤</span><span>Πλοήγηση</span></button>
+    </div>
+
+    <div class="capture-status" id="capture-status" role="status" aria-live="polite"></div>
+    <div class="message" id="message" role="status" aria-live="polite"></div>
+    <p class="note">Η θέση μένει στο κινητό σου. Η οδός βρίσκεται online με OpenStreetMap δεδομένα.</p>
+  </main>
+
+  <script>
+  (()=>{
+    'use strict';
+    const KEY='parking.saved.v1';
+    const $=id=>document.getElementById(id);
+    let saved=null;
+    let lookingUp=false;
+
     try{
-      localStorage.setItem(KEY,JSON.stringify(value));
-      saved=value;render();
-      $('capture-status').textContent='✓ Αποθηκεύτηκε — μπορείς να κλειδώσεις.';
-      resolveAddress(value);
-    }catch(error){
-      $('capture-status').textContent='Η αποθήκευση απέτυχε.';
+      const raw=localStorage.getItem(KEY);
+      if(raw){
+        const v=JSON.parse(raw);
+        if(Number.isFinite(v.lat)&&Number.isFinite(v.lon)&&Number.isFinite(v.timestamp)&&Math.abs(v.lat)<=90&&Math.abs(v.lon)<=180){
+          saved=v;
+        }
+      }
+    }catch(error){ $('message').textContent='Αδυναμία ανάγνωσης προηγούμενης θέσης.'; }
+
+    function formatDate(ts){
+      return new Intl.DateTimeFormat('el-GR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(ts));
     }
-  }
-  // Stop after five seconds, but accept a sufficiently good fix sooner.
-  timer=setTimeout(finish,5000);
-  try{
-    watchId=navigator.geolocation.watchPosition(
-      position=>{
-        if(finished)return;
-        const c=position.coords;
-        if(!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude)||Math.abs(c.latitude)>90||Math.abs(c.longitude)>180)return;
-        const accuracy=Number.isFinite(c.accuracy)?c.accuracy:null;
-        const candidate={lat:c.latitude,lon:c.longitude,accuracy};
-        if(!best || (accuracy!==null&&(best.accuracy===null||accuracy<best.accuracy)))best=candidate;
-        if(accuracy!==null && accuracy<=35)finish();
-      },
-      error=>{
-        if(finished)return;
-        if(error.code===1 && stop())$('capture-status').textContent='Δεν δόθηκε άδεια τοποθεσίας.';
-      },
-      {enableHighAccuracy:true,timeout:5000,maximumAge:10000}
-    );
-    if(finished && watchId!==null)navigator.geolocation.clearWatch(watchId);
-  }catch(error){
-    if(stop())$('capture-status').textContent='Δεν ήταν δυνατή η λήψη GPS.';
-  }
-});
-$('map').addEventListener('click',()=>{if(!saved)return;const {lat,lon}=saved;window.open('https://www.openstreetmap.org/?mlat='+encodeURIComponent(lat)+'&mlon='+encodeURIComponent(lon)+'#map=18/'+lat+'/'+lon,'_blank','noopener,noreferrer')});$('navigate').addEventListener('click',()=>{if(!saved)return;window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(saved.lat+','+saved.lon),'_blank','noopener,noreferrer')});if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))})();</script></body></html>
+
+    function stillCurrent(record){
+      return saved && saved.timestamp===record.timestamp && saved.lat===record.lat && saved.lon===record.lon;
+    }
+
+    function streetLabel(road,house,city,record){
+      if(!road) return '';
+      const precise=Number.isFinite(record.accuracy) && record.accuracy<=40;
+      return road + (precise && house ? ' ' + house : '') + (city ? ', ' + city : '');
+    }
+
+    function photonLabel(data,record){
+      const features=Array.isArray(data?.features)?data.features:[];
+      const match=features.find(f=>f?.properties && typeof f.properties.street==='string' && f.properties.street.trim()) ||
+                  features.find(f=>f?.properties?.osm_key==='highway' && typeof f.properties.name==='string' && f.properties.name.trim());
+      const p=match?.properties || {};
+      const road=String(p.street || (p.osm_key==='highway' ? p.name : '') || '').trim();
+      return streetLabel(road,String(p.housenumber||'').trim(),String(p.city||p.locality||p.district||'').trim(),record);
+    }
+
+    function nominatimLabel(data,record){
+      const a=data?.address || {};
+      const road=String(a.road||a.pedestrian||a.residential||a.living_street||a.footway||a.path||'').trim();
+      return streetLabel(road,String(a.house_number||'').trim(),String(a.city||a.town||a.village||a.municipality||'').trim(),record);
+    }
+
+    async function requestJson(url,timeout=9000){
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),timeout);
+      try{
+        const response=await fetch(url,{signal:controller.signal,cache:'no-store'});
+        if(!response.ok) throw new Error('HTTP ' + response.status);
+        return await response.json();
+      }finally{ clearTimeout(timer); }
+    }
+
+    function setMiniRingProgress(value){
+      const deg=Math.max(0,Math.min(1,value))*360;
+      $('mini-ring').style.background=`conic-gradient(#aee8ff ${deg}deg, rgba(255,255,255,.16) ${deg}deg)`;
+    }
+
+    function setBigProgress(value){
+      const deg=Math.max(0,Math.min(1,value))*360;
+      $('big-progress').style.background=`conic-gradient(#44c6ff ${deg}deg, rgba(74,123,191,.22) ${deg}deg)`;
+    }
+
+    function render(){
+      $('map').disabled = $('navigate').disabled = !saved;
+      const unresolved = !!saved && !saved.address;
+      $('retry').classList.toggle('show', !!saved && saved.addressLookedUp && unresolved);
+      $('retry').disabled = lookingUp;
+      document.querySelector('.status-chip').classList.toggle('empty', !saved);
+
+      if(saved){
+        $('status').textContent='Αποθηκευμένη θέση';
+        $('position').textContent = saved.address?.replace(/^(Πιθανή οδός:|Κοντά:)\s*/, '') || (lookingUp ? 'Εύρεση οδού…' : (saved.addressLookedUp ? 'Άγνωστη οδός' : 'Η θέση έχει αποθηκευτεί'));
+        $('date').textContent = formatDate(saved.timestamp);
+      }else{
+        $('status').textContent='Δεν υπάρχει αποθηκευμένη θέση';
+        $('position').textContent='Πάτησε «Αποθήκευση θέσης». ';
+        $('date').textContent='—';
+      }
+    }
+
+    async function resolveAddress(record){
+      if(!record || record.addressLookedUp || lookingUp) return;
+      if(!navigator.onLine){ $('message').textContent='Χωρίς internet — η θέση έχει αποθηκευτεί.'; return; }
+      lookingUp=true; render();
+      $('message').textContent='Αναζήτηση οδού…';
+      let address='';
+      try{
+        const url='https://photon.komoot.io/reverse?lat='+encodeURIComponent(record.lat)+'&lon='+encodeURIComponent(record.lon)+'&lang=el&limit=5';
+        address = photonLabel(await requestJson(url,8000),record);
+      }catch(error){}
+      if(!address){
+        try{
+          const url='https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&accept-language=el&lat='+encodeURIComponent(record.lat)+'&lon='+encodeURIComponent(record.lon);
+          address = nominatimLabel(await requestJson(url,10000),record);
+        }catch(error){}
+      }
+      lookingUp=false;
+      if(stillCurrent(record)){
+        saved.address=address;
+        saved.addressLookedUp=true;
+        try{ localStorage.setItem(KEY, JSON.stringify(saved)); }catch(error){}
+        render();
+        $('message').textContent = address ? '' : 'Δεν βρέθηκε οδός — δοκίμασε ξανά.';
+      }else if(saved && !saved.addressLookedUp){
+        resolveAddress(saved);
+      }
+    }
+
+    render();
+    if(saved && !saved.addressLookedUp) resolveAddress(saved);
+    setMiniRingProgress(1);
+
+    $('retry').addEventListener('click',()=>{
+      if(!saved || lookingUp) return;
+      saved.addressLookedUp=false;
+      $('message').textContent='';
+      resolveAddress(saved);
+    });
+
+    $('save').addEventListener('click',()=>{
+      if(!isSecureContext){ $('capture-status').textContent='Το GPS απαιτεί HTTPS.'; return; }
+      if(!navigator.geolocation){ $('capture-status').textContent='Δεν υποστηρίζεται το GPS.'; return; }
+
+      const saveButton=$('save');
+      const saveLabel=$('save-label');
+      const bigProgress=$('big-progress');
+      const bigSeconds=$('big-seconds');
+      const progressLabel=$('progress-label');
+      let best=null, finished=false, watchId=null, timer=null, animationId=null;
+      const duration=5000;
+      const start=performance.now();
+
+      saveButton.disabled=true;
+      saveLabel.textContent='Εντοπισμός…';
+      $('capture-status').textContent='';
+      $('message').textContent='';
+      progressLabel.textContent='Καταγραφή θέσης σε 5 δευτερόλεπτα…';
+      bigProgress.hidden=false;
+      $('progress-block').classList.remove('idle');
+      setMiniRingProgress(0);
+      setBigProgress(0);
+      $('mini-seconds').textContent='5s';
+      bigSeconds.textContent='5';
+
+      function animate(now){
+        if(finished) return;
+        const elapsed=Math.max(0,Math.min(duration, now-start));
+        const ratio=elapsed/duration;
+        const remaining=Math.max(1, Math.ceil((duration-elapsed)/1000));
+        setMiniRingProgress(ratio);
+        setBigProgress(ratio);
+        $('mini-seconds').textContent = remaining + 's';
+        bigSeconds.textContent = String(remaining);
+        animationId=requestAnimationFrame(animate);
+      }
+      animationId=requestAnimationFrame(animate);
+
+      function stop(){
+        if(finished) return false;
+        finished=true;
+        clearTimeout(timer);
+        cancelAnimationFrame(animationId);
+        if(watchId!==null) navigator.geolocation.clearWatch(watchId);
+        saveButton.disabled=false;
+        saveLabel.textContent='Αποθήκευση θέσης';
+        bigProgress.hidden=true;
+        $('progress-block').classList.add('idle');
+        progressLabel.textContent='';
+        setMiniRingProgress(1);
+        $('mini-seconds').textContent='5s';
+        return true;
+      }
+
+      function finish(){
+        if(!stop()) return;
+        if(!best){
+          $('capture-status').textContent='Δεν βρέθηκε θέση. Η προηγούμενη παραμένει.';
+          return;
+        }
+        const value={lat:best.lat,lon:best.lon,accuracy:best.accuracy,timestamp:Date.now(),address:'',addressLookedUp:false};
+        try{
+          localStorage.setItem(KEY, JSON.stringify(value));
+          saved=value;
+          render();
+          $('capture-status').textContent='✓ Αποθηκεύτηκε — μπορείς να κλειδώσεις.';
+          resolveAddress(value);
+        }catch(error){
+          $('capture-status').textContent='Η αποθήκευση απέτυχε.';
+        }
+      }
+
+      timer=setTimeout(finish,duration);
+      try{
+        watchId=navigator.geolocation.watchPosition(
+          position=>{
+            if(finished) return;
+            const c=position.coords;
+            if(!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude)||Math.abs(c.latitude)>90||Math.abs(c.longitude)>180) return;
+            const accuracy=Number.isFinite(c.accuracy) ? c.accuracy : null;
+            const candidate={lat:c.latitude,lon:c.longitude,accuracy};
+            if(!best || (accuracy!==null && (best.accuracy===null || accuracy<best.accuracy))) best=candidate;
+            if(accuracy!==null && accuracy<=35) finish();
+          },
+          error=>{
+            if(finished) return;
+            if(error.code===1 && stop()) $('capture-status').textContent='Δεν δόθηκε άδεια τοποθεσίας.';
+          },
+          {enableHighAccuracy:true, timeout:5000, maximumAge:10000}
+        );
+        if(finished && watchId!==null) navigator.geolocation.clearWatch(watchId);
+      }catch(error){
+        if(stop()) $('capture-status').textContent='Δεν ήταν δυνατή η λήψη GPS.';
+      }
+    });
+
+    $('map').addEventListener('click',()=>{
+      if(!saved) return;
+      window.open('https://www.openstreetmap.org/?mlat='+encodeURIComponent(saved.lat)+'&mlon='+encodeURIComponent(saved.lon)+'#map=18/'+saved.lat+'/'+saved.lon, '_blank', 'noopener,noreferrer');
+    });
+
+    $('navigate').addEventListener('click',()=>{
+      if(!saved) return;
+      window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(saved.lat+','+saved.lon), '_blank', 'noopener,noreferrer');
+    });
+
+    if('serviceWorker' in navigator){
+      window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+    }
+  })();
+  </script>
+</body>
+</html>
