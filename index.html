@@ -1,22 +1,25 @@
-<!doctype html><html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101b2b"><meta name="description" content="Τοπική αποθήκευση θέσης στάθμευσης"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" type="image/svg+xml" href="./icon.svg"><title>Το Πάρκινγκ μου</title><style>:root{font-family:system-ui,sans-serif;color-scheme:dark;background:#101b2b;color:#f7fafc}*{box-sizing:border-box}body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:20px}.app{width:min(100%,480px)}header{text-align:center;margin-bottom:24px}h1{font-size:1.8rem;margin:12px 0 4px}header p,.muted{color:#aab9ce}.panel{background:#1a2a40;border:1px solid #31445e;border-radius:20px;padding:24px;text-align:center}.status{display:inline-block;background:#27445d;border-radius:30px;padding:7px 14px;font-size:.9rem;margin-bottom:14px}.position{font-size:1.12rem;font-weight:700;overflow-wrap:anywhere}.coords{font-size:.8rem;color:#8ea4c0;margin-top:9px;overflow-wrap:anywhere}.date,.accuracy{font-size:.9rem;color:#b6c6d9;margin-top:8px}.actions{display:grid;gap:12px;margin-top:18px}button{cursor:pointer;width:100%;padding:17px;border:0;border-radius:14px;font-weight:750;font-size:1rem;color:white;background:#2673ed}button.secondary{background:#253e5b;border:1px solid #48617d}button:disabled{opacity:.5;cursor:not-allowed}button[hidden]{display:none}.note{font-size:.82rem;color:#aab9ce;text-align:center;line-height:1.6;margin-top:22px}#message{min-height:2.5em;color:#d9e8fa;text-align:center;font-size:.9rem;margin-top:12px}</style></head><body><main class="app"><header><div aria-hidden="true" style="font-size:3rem">🚗</div><h1>Το Πάρκινγκ μου</h1><p>Βρες εύκολα πού άφησες το αυτοκίνητο</p></header><section class="panel" aria-live="polite"><div class="status" id="status">Δεν υπάρχει αποθηκευμένη θέση</div><div class="position" id="position">Πάτησε «Αποθήκευση θέσης» όταν παρκάρεις.</div><div class="coords" id="coords"></div><div class="date" id="date"></div><div class="accuracy" id="accuracy"></div></section><div class="actions"><button id="save">📍 Αποθήκευση θέσης</button><button class="secondary" id="retry" hidden>↻ Επανάληψη εύρεσης οδού</button><button class="secondary" id="map" disabled>🗺️ Προβολή χάρτη</button><button class="secondary" id="navigate" disabled>➤ Πλοήγηση στο αυτοκίνητο</button></div><div id="capture-status" role="status" aria-live="polite" style="margin-top:12px;text-align:center;font-size:.94rem;font-weight:650;min-height:1.2em"></div><div id="message" role="status" aria-live="polite"></div><p class="note">Η θέση αποθηκεύεται μόνο σε αυτόν τον browser. Για την εύρεση οδού στέλνονται οι συντεταγμένες σε Photon ή OpenStreetMap Nominatim (© OpenStreetMap contributors), μόνο όταν αποθηκεύεις θέση, στην πρώτη αναζήτηση παλιάς θέσης ή όταν ζητάς επανάληψη. Ο χάρτης και η πλοήγηση ανοίγουν εξωτερικές υπηρεσίες.</p></main><script>(()=>{'use strict';const KEY='parking.saved.v1',$=id=>document.getElementById(id);let saved=null;try{const raw=localStorage.getItem(KEY);if(raw){const v=JSON.parse(raw);if(Number.isFinite(v.lat)&&Number.isFinite(v.lon)&&Number.isFinite(v.timestamp)&&Math.abs(v.lat)<=90&&Math.abs(v.lon)<=180)saved=v}}catch(e){$('message').textContent='Αδυναμία ανάγνωσης προηγούμενης θέσης.'}function render(){
+<!doctype html><html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101b2b"><meta name="description" content="Τοπική αποθήκευση θέσης στάθμευσης"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" type="image/svg+xml" href="./icon.svg"><title>Το Πάρκινγκ μου</title><style>:root{font-family:system-ui,sans-serif;color-scheme:dark;background:#101b2b;color:#f7fafc}*{box-sizing:border-box}body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:20px}.app{width:min(100%,480px)}header{text-align:center;margin-bottom:24px}h1{font-size:1.8rem;margin:12px 0 4px}header p,.muted{color:#aab9ce}.panel{background:#1a2a40;border:1px solid #31445e;border-radius:20px;padding:24px;text-align:center}.status{display:inline-block;background:#27445d;border-radius:30px;padding:7px 14px;font-size:.9rem;margin-bottom:14px}.position{font-size:1.12rem;font-weight:700;overflow-wrap:anywhere}.date{font-size:.9rem;color:#b6c6d9;margin-top:9px}.actions{display:grid;gap:12px;margin-top:18px}button{cursor:pointer;width:100%;padding:17px;border:0;border-radius:14px;font-weight:750;font-size:1rem;color:white;background:#2673ed}button.secondary{background:#253e5b;border:1px solid #48617d}button:disabled{opacity:.5;cursor:not-allowed}button[hidden]{display:none}.note{font-size:.76rem;color:#859ab4;text-align:center;line-height:1.5;margin-top:18px}
+#message{color:#d9e8fa;text-align:center;font-size:.85rem;margin-top:9px}
+#message:empty{display:none}
+#capture-status{color:#a8f2cb;text-align:center;font-size:.91rem;font-weight:650;margin-top:12px}
+#capture-status:empty{display:none}
+.gps-progress{display:flex;align-items:center;justify-content:center;gap:13px;margin:18px 0 2px;color:#b8cce5;font-size:.9rem;font-weight:600}
+.gps-progress[hidden]{display:none}
+.gps-ring{width:66px;height:66px;display:grid;place-items:center;border-radius:50%;padding:5px;background:conic-gradient(#65dfb0 0deg,#2a435e 0deg)}
+.gps-inner{width:100%;height:100%;display:grid;place-items:center;border-radius:50%;background:#101b2b;font-size:1.4rem;font-weight:800;color:#f7fafc;font-variant-numeric:tabular-nums}
+@media(prefers-reduced-motion:reduce){.gps-ring{transition:none}}</style></head><body><main class="app"><header><div aria-hidden="true" style="font-size:3rem">🚗</div><h1>Το Πάρκινγκ μου</h1></header><section class="panel" aria-live="polite"><div class="status" id="status">Δεν υπάρχει αποθηκευμένη θέση</div><div class="position" id="position">Πάτησε «Αποθήκευση θέσης» όταν παρκάρεις.</div><div class="date" id="date"></div></section><div class="actions"><button id="save">📍 Αποθήκευση θέσης</button><button class="secondary" id="retry" hidden>↻ Επανάληψη εύρεσης οδού</button><button class="secondary" id="map" disabled>🗺️ Προβολή χάρτη</button><button class="secondary" id="navigate" disabled>➤ Πλοήγηση στο αυτοκίνητο</button></div><div class="gps-progress" id="gps-progress" hidden><div class="gps-ring" id="gps-ring"><div class="gps-inner" id="gps-seconds">5</div></div><span>Εντοπισμός θέσης…</span></div><div id="capture-status" role="status" aria-live="polite"></div><div id="message" role="status" aria-live="polite"></div><p class="note">Η θέση μένει στο κινητό. Η εύρεση οδού γίνεται online (© OpenStreetMap contributors).</p></main><script>(()=>{'use strict';const KEY='parking.saved.v1',$=id=>document.getElementById(id);let saved=null;try{const raw=localStorage.getItem(KEY);if(raw){const v=JSON.parse(raw);if(Number.isFinite(v.lat)&&Number.isFinite(v.lon)&&Number.isFinite(v.timestamp)&&Math.abs(v.lat)<=90&&Math.abs(v.lon)<=180)saved=v}}catch(e){$('message').textContent='Αδυναμία ανάγνωσης προηγούμενης θέσης.'}function render(){
   $('map').disabled=$('navigate').disabled=!saved;
   const unresolved=!!saved && !saved.address;
   $('retry').hidden=!saved || !saved.addressLookedUp || !unresolved;
   $('retry').disabled=lookingUp;
   if(saved){
     $('status').textContent='✓ Αποθηκευμένη θέση';
-    $('position').textContent=saved.address || (lookingUp?'Αναζήτηση κοντινής οδού…':(saved.addressLookedUp?'Δεν βρέθηκε οδός':'Η θέση έχει αποθηκευτεί'));
-    $('coords').textContent='Συντεταγμένες GPS: '+saved.lat.toFixed(6)+', '+saved.lon.toFixed(6);
+    $('position').textContent=saved.address || (lookingUp?'Εύρεση οδού…':(saved.addressLookedUp?'Άγνωστη οδός':'Η θέση έχει αποθηκευτεί'));
     $('date').textContent=new Intl.DateTimeFormat('el-GR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(saved.timestamp));
-    const accuracy=Number(saved.accuracy);
-    $('accuracy').textContent=Number.isFinite(accuracy)?
-      (accuracy>50?'⚠️ Χαμηλή ακρίβεια GPS: ±'+Math.round(accuracy)+' μ. — δοκίμασε ξανά σε ανοιχτό χώρο.':'Ακρίβεια GPS: περίπου ±'+Math.round(accuracy)+' μ.'):'';
   }else{
     $('status').textContent='Δεν υπάρχει αποθηκευμένη θέση';
-    $('position').textContent='Πάτησε «Αποθήκευση θέσης» όταν παρκάρεις.';
-    $('coords').textContent='';
+    $('position').textContent='Πάτησε «Αποθήκευση θέσης».';
     $('date').textContent='';
-    $('accuracy').textContent='';
   }
 }
 function stillCurrent(record){
@@ -57,7 +60,7 @@ async function resolveAddress(record){
     return;
   }
   lookingUp=true;render();
-  $('message').textContent='Αναζήτηση κοντινής οδού…';
+  $('message').textContent='';
   let address='';
   try{
     const url='https://photon.komoot.io/reverse?lat='+encodeURIComponent(record.lat)+'&lon='+encodeURIComponent(record.lon)+'&lang=el&limit=5';
@@ -77,8 +80,8 @@ async function resolveAddress(record){
     try{localStorage.setItem(KEY,JSON.stringify(saved))}catch(error){}
     render();
     $('message').textContent=address?
-      'Η οδός αποθηκεύτηκε στο κινητό. Το όνομα είναι ενδεικτικό.':
-      'Η οδός δεν είναι διαθέσιμη. Μπορείς να δοκιμάσεις ξανά ή να ανοίξεις τον χάρτη.';
+      '':
+      'Δεν βρέθηκε οδός — δοκίμασε ξανά.';
   }else if(saved && !saved.addressLookedUp){
     resolveAddress(saved);
   }
@@ -92,62 +95,74 @@ $('retry').addEventListener('click',()=>{
 });
 $('save').addEventListener('click',()=>{
   if(!isSecureContext){$('capture-status').textContent='Το GPS απαιτεί HTTPS.';return}
-  if(!navigator.geolocation){$('capture-status').textContent='Η τοποθεσία δεν υποστηρίζεται.';return}
-  const button=$('save');
+  if(!navigator.geolocation){$('capture-status').textContent='Δεν υποστηρίζεται το GPS.';return}
+  const button=$('save'),progress=$('gps-progress'),ring=$('gps-ring'),seconds=$('gps-seconds');
   button.disabled=true;
-  button.textContent='⏳ Εντοπισμός έως 5″…';
-  $('capture-status').textContent='Κράτησε την οθόνη ανοιχτή έως 5 δευτερόλεπτα.';
+  $('capture-status').textContent='';
   $('message').textContent='';
-  let best=null, finished=false, watchId=null, timer=null;
+  progress.hidden=false;
+  const start=performance.now();
+  let best=null,finished=false,watchId=null,timer=null,animationId=null;
 
+  function animate(now){
+    if(finished)return;
+    const elapsed=Math.max(0,Math.min(5000,now-start));
+    const angle=elapsed/5000*360;
+    ring.style.background='conic-gradient(#65dfb0 '+angle+'deg,#2a435e '+angle+'deg)';
+    seconds.textContent=String(Math.max(1,Math.ceil((5000-elapsed)/1000)));
+    animationId=requestAnimationFrame(animate);
+  }
+  seconds.textContent='5';
+  ring.style.background='conic-gradient(#65dfb0 0deg,#2a435e 0deg)';
+  animationId=requestAnimationFrame(animate);
   function stop(){
     if(finished)return false;
     finished=true;
     clearTimeout(timer);
+    cancelAnimationFrame(animationId);
     if(watchId!==null)navigator.geolocation.clearWatch(watchId);
+    progress.hidden=true;
     button.disabled=false;
-    button.textContent='📍 Αποθήκευση θέσης';
     return true;
   }
   function finish(){
     if(!stop())return;
     if(!best){
-      $('capture-status').textContent='Δεν βρέθηκε στίγμα μέσα σε 5 δευτερόλεπτα. Η παλιά θέση δεν άλλαξε.';
+      $('capture-status').textContent='Δεν βρέθηκε θέση. Η προηγούμενη παραμένει.';
       return;
     }
     const value={lat:best.lat,lon:best.lon,accuracy:best.accuracy,timestamp:Date.now(),address:'',addressLookedUp:false};
     try{
       localStorage.setItem(KEY,JSON.stringify(value));
-      saved=value;
-      render();
-      $('capture-status').textContent='✓ Η θέση αποθηκεύτηκε. Μπορείς να κλειδώσεις το κινητό.';
+      saved=value;render();
+      $('capture-status').textContent='✓ Αποθηκεύτηκε — μπορείς να κλειδώσεις.';
       resolveAddress(value);
-    }catch(e){
-      $('capture-status').textContent='Η αποθήκευση απέτυχε. Η προηγούμενη θέση διατηρήθηκε.';
+    }catch(error){
+      $('capture-status').textContent='Η αποθήκευση απέτυχε.';
     }
   }
-  // Keep the best GPS reading available in the 5-second window, even if approximate.
+  // Stop after five seconds, but accept a sufficiently good fix sooner.
+  timer=setTimeout(finish,5000);
   try{
     watchId=navigator.geolocation.watchPosition(
-      p=>{
+      position=>{
         if(finished)return;
-        const c=p.coords;
+        const c=position.coords;
         if(!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude)||Math.abs(c.latitude)>90||Math.abs(c.longitude)>180)return;
         const accuracy=Number.isFinite(c.accuracy)?c.accuracy:null;
         const candidate={lat:c.latitude,lon:c.longitude,accuracy};
-        if(!best || (accuracy!==null && (best.accuracy===null || accuracy<best.accuracy)))best=candidate;
+        if(!best || (accuracy!==null&&(best.accuracy===null||accuracy<best.accuracy)))best=candidate;
         if(accuracy!==null && accuracy<=35)finish();
       },
       error=>{
         if(finished)return;
-        if(error.code===1){
-          if(stop())$('capture-status').textContent='Δεν δόθηκε άδεια τοποθεσίας. Η θέση δεν άλλαξε.';
-        }
+        if(error.code===1 && stop())$('capture-status').textContent='Δεν δόθηκε άδεια τοποθεσίας.';
       },
       {enableHighAccuracy:true,timeout:5000,maximumAge:10000}
     );
-    timer=setTimeout(finish,5000);
-  }catch(e){
-    if(stop())$('capture-status').textContent='Δεν ήταν δυνατή η έναρξη GPS. Η θέση δεν άλλαξε.';
+    if(finished && watchId!==null)navigator.geolocation.clearWatch(watchId);
+  }catch(error){
+    if(stop())$('capture-status').textContent='Δεν ήταν δυνατή η λήψη GPS.';
   }
-});$('map').addEventListener('click',()=>{if(!saved)return;const {lat,lon}=saved;window.open('https://www.openstreetmap.org/?mlat='+encodeURIComponent(lat)+'&mlon='+encodeURIComponent(lon)+'#map=18/'+lat+'/'+lon,'_blank','noopener,noreferrer')});$('navigate').addEventListener('click',()=>{if(!saved)return;window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(saved.lat+','+saved.lon),'_blank','noopener,noreferrer')});if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))})();</script></body></html>
+});
+$('map').addEventListener('click',()=>{if(!saved)return;const {lat,lon}=saved;window.open('https://www.openstreetmap.org/?mlat='+encodeURIComponent(lat)+'&mlon='+encodeURIComponent(lon)+'#map=18/'+lat+'/'+lon,'_blank','noopener,noreferrer')});$('navigate').addEventListener('click',()=>{if(!saved)return;window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(saved.lat+','+saved.lon),'_blank','noopener,noreferrer')});if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))})();</script></body></html>
