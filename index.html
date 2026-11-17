@@ -200,6 +200,29 @@
  .parking-hero-art{border-radius:12px!important}
 }
 
+
+/* Five most recent parking locations, collapsed until requested. */
+.parking-history{margin:14px 0 8px;border:1px solid var(--edge);background:linear-gradient(180deg,rgba(17,39,72,.95),rgba(10,29,54,.92));border-radius:16px;overflow:hidden;box-shadow:0 8px 20px rgba(0,5,18,.16)}
+.parking-history[hidden]{display:none!important}
+.parking-history-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:46px;padding:11px 14px;color:#fff;font-size:14px;font-weight:800;text-align:left;cursor:pointer;list-style:none}
+.parking-history-toggle::-webkit-details-marker{display:none}
+.parking-history-toggle::after{content:"⌄";font-size:18px;color:#9acfff;transition:transform .18s}
+.parking-history[open] .parking-history-toggle::after{transform:rotate(180deg)}
+.parking-history-count{margin-left:auto;white-space:nowrap;font-size:11px;color:#a6ceff;border:1px solid rgba(112,168,243,.38);background:rgba(35,77,133,.46);border-radius:999px;padding:3px 8px}
+.parking-history-hint{margin:0 13px 10px;text-align:left;font-size:11px;color:var(--sub);line-height:1.4}
+.parking-history-list{display:grid;gap:8px;padding:0 10px 12px}
+.parking-history-item{background:rgba(32,71,115,.72);border:1px solid rgba(111,165,235,.35);border-radius:12px;padding:10px 11px;text-align:left;min-width:0}
+.parking-history-item.is-current{border-color:rgba(68,198,162,.65)}
+.parking-history-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.parking-history-date{font-size:12px;font-weight:800;color:#f0f8ff}
+.parking-history-active{font-size:10px;color:#b3f9e4;font-weight:700;white-space:nowrap}
+.parking-history-place{font-size:12px;color:#d7e8fc;margin:5px 0 3px;overflow-wrap:anywhere}
+.parking-history-coords{font-size:10px;color:#aac2e0;font-variant-numeric:tabular-nums}
+.parking-history-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.parking-history-actions button{min-height:38px;padding:8px 4px;font-size:12px;font-weight:800;color:#fff;background:#255c99;border:1px solid #6098d6;border-radius:9px;cursor:pointer}
+.parking-history-actions button:focus-visible,.parking-history-toggle:focus-visible{outline:2px solid #8cd4ff;outline-offset:2px}
+@media(max-width:360px){.parking-history-item{padding:9px}.parking-history-actions button{font-size:11px}}
+
 </style>
 </head>
 <body>
@@ -240,6 +263,12 @@
       <button id="navigate" class="secondary" type="button" disabled><span class="icon">➤</span><span>Πλοήγηση</span></button>
     </div>
 
+    <details class="parking-history" id="history-panel" hidden>
+      <summary class="parking-history-toggle"><span>🕘 Ιστορικό θέσεων</span><span class="parking-history-count" id="history-count">0/5</span></summary>
+      <p class="parking-history-hint">Οι 5 τελευταίες αποθηκευμένες θέσεις σε αυτή τη συσκευή.</p>
+      <div class="parking-history-list" id="history-list"></div>
+    </details>
+
     <div class="capture-status" id="capture-status" role="status" aria-live="polite"></div>
     <div class="message" id="message" role="status" aria-live="polite"></div>
   </main>
@@ -248,22 +277,109 @@
   (()=>{
     'use strict';
     const KEY='parking.saved.v1';
+    const HISTORY_KEY='parking.history.v1', HISTORY_LIMIT=5;
     const $=id=>document.getElementById(id);
-    let saved=null;
-    let lookingUp=false;
+    let saved=null, history=[], lookingUp=false;
+    function validPosition(v){
+      return v && typeof v==='object' && Number.isFinite(v.lat) && Number.isFinite(v.lon)
+        && Math.abs(v.lat)<=90 && Math.abs(v.lon)<=180 && Number.isFinite(v.timestamp)
+        && Number.isFinite(new Date(v.timestamp).getTime());
+    }
+    function sameRecord(a,b){
+      return !!a && !!b && a.timestamp===b.timestamp && a.lat===b.lat && a.lon===b.lon;
+    }
+    function uniqueHistory(items){
+      const out=[];
+      for(const item of items){
+        if(!validPosition(item)||out.some(x=>sameRecord(x,item)))continue;
+        out.push(item);
+        if(out.length===HISTORY_LIMIT)break;
+      }
+      return out;
+    }
+    try{
+      const raw=localStorage.getItem(HISTORY_KEY),items=raw?JSON.parse(raw):[];
+      history=uniqueHistory(Array.isArray(items)?items:[]);
+    }catch(_){history=[];}
+
 
     try{
       const raw=localStorage.getItem(KEY);
       if(raw){
         const v=JSON.parse(raw);
-        if(Number.isFinite(v.lat)&&Number.isFinite(v.lon)&&Number.isFinite(v.timestamp)&&Math.abs(v.lat)<=90&&Math.abs(v.lon)<=180){
+        if(validPosition(v)){
           saved=v;
+          // Automatically include a previously saved pin when upgrading.
+          history=uniqueHistory([saved,...history]);
         }
       }
     }catch(error){ $('message').textContent='Αδυναμία ανάγνωσης προηγούμενης θέσης.'; }
 
     function formatDate(ts){
       return new Intl.DateTimeFormat('el-GR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(ts));
+    }
+
+
+    function formatCoordinates(record){
+      return record.lat.toFixed(5)+', '+record.lon.toFixed(5);
+    }
+    function showMap(record){
+      window.open('https://www.openstreetmap.org/?mlat='+encodeURIComponent(record.lat)+'&mlon='+encodeURIComponent(record.lon)+'#map=18/'+record.lat+'/'+record.lon,'_blank','noopener,noreferrer');
+    }
+    function navigateTo(record){
+      window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(record.lat+','+record.lon),'_blank','noopener,noreferrer');
+    }
+    function renderHistory(){
+      const panel=$('history-panel'),list=$('history-list');
+      panel.hidden=history.length===0;
+      $('history-count').textContent=history.length+'/'+HISTORY_LIMIT;
+      list.replaceChildren();
+      for(const record of history){
+        const card=document.createElement('article');
+        card.className='parking-history-item'+(sameRecord(saved,record)?' is-current':'');
+        const head=document.createElement('div');
+        head.className='parking-history-head';
+        const when=document.createElement('strong');
+        when.className='parking-history-date';when.textContent=formatDate(record.timestamp);
+        head.appendChild(when);
+        if(sameRecord(saved,record)){
+          const active=document.createElement('span');
+          active.className='parking-history-active';active.textContent='✓ Τρέχουσα';
+          head.appendChild(active);
+        }
+        const place=document.createElement('div');
+        place.className='parking-history-place';
+        place.textContent=record.address?.replace(/^(Πιθανή οδός:|Κοντά:)\s*/,'') || 'Αποθηκευμένη θέση';
+        const coords=document.createElement('div');
+        coords.className='parking-history-coords';coords.textContent=formatCoordinates(record);
+        const actions=document.createElement('div');
+        actions.className='parking-history-actions';
+        const map=document.createElement('button');
+        map.type='button';map.textContent='🗺️ Χάρτης';
+        map.addEventListener('click',()=>showMap(record));
+        const nav=document.createElement('button');
+        nav.type='button';nav.textContent='➤ Πλοήγηση';
+        nav.addEventListener('click',()=>navigateTo(record));
+        actions.append(map,nav);
+        card.append(head,place,coords,actions);
+        list.appendChild(card);
+      }
+    }
+    function persistNewPosition(value){
+      // Save the history first: an unavailable storage quota cannot erase the old pin.
+      const next=uniqueHistory([value,...history]);
+      const previousRaw=localStorage.getItem(HISTORY_KEY);
+      localStorage.setItem(HISTORY_KEY,JSON.stringify(next));
+      try{localStorage.setItem(KEY,JSON.stringify(value));}
+      catch(error){
+        try{
+          if(previousRaw===null)localStorage.removeItem(HISTORY_KEY);
+          else localStorage.setItem(HISTORY_KEY,previousRaw);
+        }catch(_){}
+        throw error;
+      }
+      history=next;
+      saved=value;
     }
 
     function stillCurrent(record){
@@ -323,6 +439,7 @@
         $('position').textContent='Πάτησε «Αποθήκευση θέσης». ';
         $('date').textContent='—';
       }
+      renderHistory();
     }
 
     async function resolveAddress(record){
@@ -346,6 +463,8 @@
         saved.address=address;
         saved.addressLookedUp=true;
         try{ localStorage.setItem(KEY, JSON.stringify(saved)); }catch(error){}
+        history=history.map(item=>sameRecord(item,record)?{...item,address,addressLookedUp:true}:item);
+        try{ localStorage.setItem(HISTORY_KEY,JSON.stringify(history)); }catch(error){}
         render();
         $('message').textContent = address ? '' : 'Δεν βρέθηκε οδός — δοκίμασε ξανά.';
       }else if(saved && !saved.addressLookedUp){
@@ -419,8 +538,7 @@
         }
         const value={lat:best.lat,lon:best.lon,accuracy:best.accuracy,timestamp:Date.now(),address:'',addressLookedUp:false};
         try{
-          localStorage.setItem(KEY, JSON.stringify(value));
-          saved=value;
+          persistNewPosition(value);
           render();
           $('capture-status').textContent='✓ Αποθηκεύτηκε — μπορείς να κλειδώσεις.';
           resolveAddress(value);
@@ -455,12 +573,12 @@
 
     $('map').addEventListener('click',()=>{
       if(!saved) return;
-      window.open('https://www.openstreetmap.org/?mlat='+encodeURIComponent(saved.lat)+'&mlon='+encodeURIComponent(saved.lon)+'#map=18/'+saved.lat+'/'+saved.lon, '_blank', 'noopener,noreferrer');
+      showMap(saved);
     });
 
     $('navigate').addEventListener('click',()=>{
       if(!saved) return;
-      window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(saved.lat+','+saved.lon), '_blank', 'noopener,noreferrer');
+      navigateTo(saved);
     });
 
     if('serviceWorker' in navigator){
