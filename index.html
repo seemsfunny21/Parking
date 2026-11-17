@@ -171,6 +171,27 @@
     @media(max-width:375px){.app .hero{margin-bottom:9px}.parking-hero-art{border-radius:13px}}
     @media(max-height:620px){.parking-hero-art{max-height:105px;object-fit:fill}}
 
+  
+    /* Shared premium hero height — identical to Reminders and Routes. */
+    @media(max-width:760px){
+      .parking-hero-art{
+        width:100%!important;
+        height:clamp(74px,12dvh,112px)!important;
+        max-height:none!important;
+        object-fit:cover!important;
+        object-position:center!important;
+      }
+    }
+    @media(min-width:761px){
+      .parking-hero-art{
+        width:100%!important;
+        height:150px!important;
+        max-height:none!important;
+        object-fit:cover!important;
+        object-position:center!important;
+      }
+    }
+
   </style>
 </head>
 <body>
