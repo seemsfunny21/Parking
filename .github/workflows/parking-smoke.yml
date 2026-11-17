@@ -1,0 +1,21 @@
+name: Parking history regression
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'sw.js'
+      - 'tests/parking-history.cjs'
+      - '.github/workflows/parking-smoke.yml'
+  workflow_dispatch:
+jobs:
+  parking-history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Parking save, history, navigation and offline cache
+        run: node tests/parking-history.cjs
