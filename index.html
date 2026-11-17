@@ -158,12 +158,25 @@
       :is(.primary-btn,.secondary,.retry){transition:none!important}
     }
 
+  
+    /* Premium illustrated header, replacing the old car emoji. */
+    body{padding-top:10px}
+    .app .hero{padding:0;margin:0 0 12px}
+    .parking-hero-art{
+      display:block;width:100%;height:auto;max-height:145px;
+      border:1px solid rgba(101,179,255,.32);border-radius:17px;
+      object-fit:contain;background:#071736;
+      box-shadow:0 12px 32px rgba(0,5,18,.35);
+    }
+    @media(max-width:375px){.app .hero{margin-bottom:9px}.parking-hero-art{border-radius:13px}}
+    @media(max-height:620px){.parking-hero-art{max-height:105px;object-fit:fill}}
+
   </style>
 </head>
 <body>
   <main class="app">
-    <header class="hero" aria-label="Πάρκινγκ">
-      <div class="car-glow"><div class="car-emoji" aria-hidden="true">🚗</div></div>
+    <header class="hero" aria-label="Parking">
+      <img class="parking-hero-art" src="./hero-banner.svg" alt="Parking — η θέση του αυτοκινήτου σου" width="1200" height="400" decoding="async">
     </header>
 
     <section class="panel" aria-live="polite">
