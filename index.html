@@ -136,6 +136,28 @@
       .meta{font-size:.97rem}
       .primary-main{font-size:1.02rem}
     }
+  
+    /* Premium mobile consistency: clearer keyboard/touch states, no duplicate UI. */
+    :is(.primary-btn,.secondary,.retry){
+      touch-action:manipulation;
+      -webkit-tap-highlight-color:transparent;
+      transition:filter .16s ease,box-shadow .16s ease,transform .16s ease;
+    }
+    :is(button,a):focus-visible{
+      outline:3px solid #92d8ff;
+      outline-offset:3px;
+    }
+    .panel:focus-within{
+      border-color:rgba(130,201,255,.54);
+      box-shadow:var(--shadow),0 0 0 1px rgba(130,201,255,.12);
+    }
+    @media(hover:hover){
+      :is(.primary-btn,.secondary,.retry):not(:disabled):hover{filter:brightness(1.08)}
+    }
+    @media(prefers-reduced-motion:reduce){
+      :is(.primary-btn,.secondary,.retry){transition:none!important}
+    }
+
   </style>
 </head>
 <body>
