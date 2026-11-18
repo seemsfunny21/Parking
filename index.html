@@ -278,6 +278,42 @@
 @media(max-width:360px){.actions{gap:9px}.actions .action-tile{min-height:94px;font-size:.85rem;padding:9px 5px}.parking-history-item{padding:10px}.parking-history-actions button{font-size:.73rem}}
 @media(prefers-reduced-motion:reduce){.actions .action-tile{transition:none!important}}
 
+
+/* Parking desktop/TV dashboard: larger position card and adjacent actions. */
+@media (min-width:1100px){
+ body{padding:clamp(18px,2vw,34px) clamp(24px,3vw,58px) 40px}
+ .app{
+  max-width:1320px;display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(420px,.83fr);
+  align-items:start;gap:16px clamp(22px,2vw,38px)
+ }
+ .app>.hero{grid-column:1/-1;grid-row:1;width:min(680px,100%);margin:0 auto 10px}
+ .parking-hero-art{height:clamp(104px,10vh,145px);max-height:none;object-fit:cover}
+ .app>.panel{grid-column:1;grid-row:2;min-height:252px;padding:28px 28px 24px}
+ .app>.panel .place-name{font-size:clamp(30px,2.2vw,42px);line-height:1.16}
+ .app>.actions{
+  grid-column:2;grid-row:2/span 2;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-content:start;gap:14px;margin:0
+ }
+ .actions>.tile-save{grid-column:1/-1;min-height:132px}
+ .actions .action-tile{min-height:110px;font-size:clamp(14px,.9vw,17px)}
+ .app>.progress-block{grid-column:1;grid-row:3;padding:14px 0}
+ .app>#retry{grid-column:1;grid-row:4}
+ .app>.parking-history{
+  grid-column:1/-1;grid-row:5;
+  margin:4px 0;padding:8px;border-radius:20px
+ }
+ .app>.parking-history .parking-history-list{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px
+ }
+ .app>.capture-status,.app>.message{grid-column:1/-1}
+}
+@media (min-width:1800px){
+ .app{max-width:1500px;grid-template-columns:minmax(0,1fr) minmax(510px,.8fr)}
+ .app>.panel{min-height:288px;padding:36px}
+ .app>.parking-history .parking-history-list{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
 </style>
 </head>
 <body>
