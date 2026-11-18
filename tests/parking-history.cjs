@@ -81,6 +81,8 @@ function createEnvironment(storage,coordinates=[]){
   vm.runInNewContext(script,ctx);
   return{get,storage,links,statusChip,check,save(){get('save').click();}};
 }
+assert.equal((html.match(/class="action-tile /g)||[]).length,4,'Four consistent 2x2 action cards exist');
+assert.ok(html.includes('grid-template-columns:repeat(2,minmax(0,1fr))'),'Actions use a 2x2 grid');
 const existing=position(0);
 {
   const app=createEnvironment(new FakeStorage());
@@ -95,6 +97,13 @@ const existing=position(0);
   assert.equal(app.get('history-count').textContent,'1/5');
   assert.equal(app.get('history-list').children.length,1);
   assert.equal(app.get('history-list').children[0].className.includes('is-current'),true);
+  assert.equal(app.get('history-toggle').disabled,false,'History tile enabled when pins exist');
+  assert.equal(app.get('history-tile-count').textContent,'1/5','Fourth tile shows the count');
+  assert.equal(app.get('history-panel').classList.contains('is-collapsed'),true,'History starts collapsed');
+  app.get('history-toggle').click();
+  assert.equal(app.get('history-panel').classList.contains('is-collapsed'),false,'History tile opens the panel');
+  app.get('history-toggle').click();
+  assert.equal(app.get('history-panel').classList.contains('is-collapsed'),true,'History tile closes the panel');
   assert.equal(store.getItem(HISTORY),null,'Do not change storage merely by viewing a legacy pin');
   assert.equal(store.getItem(ACTIVE),JSON.stringify(existing),'Legacy current pin must remain identical');
 }
@@ -143,5 +152,5 @@ const sw=fs.readFileSync(path.join(__dirname,'..','sw.js'),'utf8');
 new vm.Script(sw,{filename:'sw.js'});
 assert.ok(sw.includes('parking-shell-')&&sw.includes('key.startsWith(PREFIX)'),
   'Cache cleanup must not touch other Applications projects');
-assert.ok(sw.includes('v15'),'New history app-shell version must be cached');
+assert.ok(sw.includes('v16'),'New history app-shell version must be cached');
 console.log('PASS Parking: empty state, legacy migration, 5-pin rotation, map/navigation, reload, failure rollback, XSS-safe text, isolated cache');
