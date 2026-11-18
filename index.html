@@ -338,6 +338,7 @@
   <script>
   (()=>{
     'use strict';
+    const APP_BUILD='parking-v17';
     const KEY='parking.saved.v1';
     const HISTORY_KEY='parking.history.v1', HISTORY_LIMIT=5;
     const $=id=>document.getElementById(id);
@@ -593,6 +594,7 @@
         bigProgress.hidden=true;
         $('progress-block').classList.add('idle');
         progressLabel.textContent='';
+        checkPendingBuild();
         return true;
       }
 
@@ -654,8 +656,63 @@
       navigateTo(saved);
     });
 
+    /* Mobile PWA updates: detect a newer build when opening or resuming the app.
+       Refresh only the app shell; never clear localStorage or saved parking pins. */
+    let versionCheckBusy=false, pendingBuild='', lastResumeCheck=0;
+    async function checkForNewBuild(){
+      if(versionCheckBusy)return;
+      versionCheckBusy=true;
+      try{
+        const url='./version.json?check='+Date.now();
+        const response=await fetch(url,{cache:'no-store'});
+        if(!response.ok)return;
+        const current=await response.json();
+        const next=current?.build;
+        if(typeof next!=='string'||!/^parking-v[0-9]{1,5}$/.test(next)||next===APP_BUILD)return;
+        if($('save').disabled){pendingBuild=next;return;}
+        // A single automatic navigation per build prevents reload loops when offline.
+        if(sessionStorage.getItem('parking.reloadedForBuild')===next)return;
+        sessionStorage.setItem('parking.reloadedForBuild',next);
+        window.location.replace('./?version='+encodeURIComponent(next));
+      }catch(error){
+        // Offline use is supported: keep the current shell and all saved positions.
+      }finally{versionCheckBusy=false}
+    }
+    function checkPendingBuild(){
+      if(pendingBuild&&!$('save').disabled){
+        pendingBuild='';
+        checkForNewBuild();
+      }
+    }
     if('serviceWorker' in navigator){
-      window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+      async function refreshAppShell(){
+        try{
+          const registration=await navigator.serviceWorker.getRegistration('./');
+          if(registration)await registration.update();
+        }catch(error){}
+        await checkForNewBuild();
+      }
+      window.addEventListener('load',async()=>{
+        try{
+          const registration=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});
+          await registration.update();
+        }catch(error){}
+        await checkForNewBuild();
+      });
+      document.addEventListener('visibilitychange',()=>{
+        if(document.visibilityState==='visible')refreshAppShell();
+      });
+      window.addEventListener('pageshow',event=>{
+        if(event.persisted)refreshAppShell();
+      });
+      window.addEventListener('focus',()=>{
+        if(Date.now()-lastResumeCheck<30000)return;
+        lastResumeCheck=Date.now();
+        refreshAppShell();
+      });
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        checkForNewBuild();
+      });
     }
   })();
   </script>
