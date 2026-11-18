@@ -223,6 +223,61 @@
 .parking-history-actions button:focus-visible,.parking-history-toggle:focus-visible{outline:2px solid #8cd4ff;outline-offset:2px}
 @media(max-width:360px){.parking-history-item{padding:9px}.parking-history-actions button{font-size:11px}}
 
+
+/* Medium-premium Parking UI: four unified action cards in a 2x2 grid. */
+.actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:14px 0 0}
+.actions .action-tile{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  min-width:0;min-height:104px;padding:12px 9px;text-align:center;
+  border-radius:19px;font-size:.93rem;font-weight:780;line-height:1.23;
+  background:linear-gradient(155deg,rgba(31,67,111,.96),rgba(14,37,70,.98));
+  border:1px solid rgba(112,172,249,.39);
+  box-shadow:inset 0 1px 0 rgba(223,243,255,.09),0 10px 25px rgba(0,7,29,.24);
+}
+.actions .action-tile .primary-main{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:0;font-size:inherit;font-weight:inherit}
+.actions .action-tile .icon{font-size:1.85rem;line-height:1.07}
+.actions .action-tile .tile-count{font-size:.71rem;font-weight:650;color:#a9cfff}
+.actions .action-tile.tile-save{
+  background:linear-gradient(160deg,#2387f9,#1155b8);border-color:rgba(167,222,255,.62);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.23),0 7px 23px rgba(12,107,242,.27);
+}
+.actions .action-tile.tile-history[aria-expanded="true"]{
+  border-color:rgba(131,211,255,.8);
+  background:linear-gradient(150deg,rgba(36,91,161,.98),rgba(17,54,104,.98));
+  box-shadow:0 0 0 1px rgba(43,152,249,.16),0 6px 20px rgba(31,113,232,.18);
+}
+.actions .action-tile:disabled{opacity:.53;box-shadow:none}
+.retry{margin-top:10px;border-radius:14px}
+/* Matching five-location history, with blue—not green—current-place accent. */
+.parking-history{
+  margin:12px 0 8px;padding:14px 12px 12px;text-align:center;
+  background:linear-gradient(165deg,rgba(18,41,73,.97),rgba(11,31,59,.98));
+  border:1px solid rgba(116,174,248,.33);border-radius:20px;
+  box-shadow:0 12px 27px rgba(0,8,29,.22);
+}
+.parking-history[hidden],.parking-history.is-collapsed{display:none!important}
+.parking-history-title{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px}
+.parking-history-title h2{margin:0;font-size:1rem;color:#fff}
+.parking-history-count{margin:0;white-space:nowrap;font-size:.7rem;color:#c8e5ff;border:1px solid rgba(116,174,248,.45);background:rgba(37,88,151,.48);border-radius:999px;padding:3px 9px}
+.parking-history-hint{margin:7px 2px 12px;text-align:center;font-size:.75rem;color:var(--sub);line-height:1.4}
+.parking-history-list{display:grid;gap:10px;padding:0}
+.parking-history-item{
+  background:linear-gradient(155deg,rgba(32,72,118,.86),rgba(19,50,90,.94));
+  border:1px solid rgba(110,167,240,.38);border-radius:17px;padding:12px;min-width:0;text-align:center;
+  box-shadow:inset 0 1px 0 rgba(235,245,255,.06),0 5px 14px rgba(0,10,33,.14);
+}
+.parking-history-item.is-current{border-color:rgba(110,192,255,.78);box-shadow:0 0 16px rgba(30,132,245,.13)}
+.parking-history-head{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}
+.parking-history-date{font-size:.78rem;font-weight:800;color:#f1f8ff}
+.parking-history-active{font-size:.66rem;font-weight:750;color:#e2f5ff;background:rgba(31,116,217,.45);border:1px solid rgba(126,201,255,.46);border-radius:999px;padding:3px 8px}
+.parking-history-place{font-size:.88rem;font-weight:720;color:#f3f9ff;margin:8px 0 5px;overflow-wrap:anywhere}
+.parking-history-coords{font-size:.72rem;color:#adc9e9;font-variant-numeric:tabular-nums}
+.parking-history-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:11px}
+.parking-history-actions button{min-height:40px;padding:9px 5px;border-radius:12px;font-size:.78rem;font-weight:800;color:#fff;background:linear-gradient(155deg,#2c6ab5,#1e4e8d);border:1px solid rgba(129,194,255,.46)}
+@media(hover:hover){.actions .action-tile:not(:disabled):hover{filter:brightness(1.08)}}
+@media(max-width:360px){.actions{gap:9px}.actions .action-tile{min-height:94px;font-size:.85rem;padding:9px 5px}.parking-history-item{padding:10px}.parking-history-actions button{font-size:.73rem}}
+@media(prefers-reduced-motion:reduce){.actions .action-tile{transition:none!important}}
+
 </style>
 </head>
 <body>
@@ -254,20 +309,27 @@
       </div>
     </section>
 
-    <div class="actions">
-      <button id="save" class="primary-btn" type="button">
-        <span class="primary-main"><span class="icon">📍</span><span id="save-label">Αποθήκευση θέσης</span></span>
+    <div class="actions" role="group" aria-label="Ενέργειες πάρκινγκ">
+      <button id="save" class="action-tile tile-save primary-btn" type="button">
+        <span class="primary-main"><span class="icon" aria-hidden="true">📍</span><span id="save-label">Αποθήκευση θέσης</span></span>
       </button>
-      <button id="retry" class="retry" type="button">↻ Επανάληψη εύρεσης οδού</button>
-      <button id="map" class="secondary" type="button" disabled><span class="icon">🗺️</span><span>Προβολή χάρτη</span></button>
-      <button id="navigate" class="secondary" type="button" disabled><span class="icon">➤</span><span>Πλοήγηση</span></button>
+      <button id="map" class="action-tile tile-map secondary" type="button" disabled>
+        <span class="icon" aria-hidden="true">🗺️</span><span>Προβολή χάρτη</span>
+      </button>
+      <button id="navigate" class="action-tile tile-navigate secondary" type="button" disabled>
+        <span class="icon" aria-hidden="true">➤</span><span>Πλοήγηση</span>
+      </button>
+      <button id="history-toggle" class="action-tile tile-history secondary" type="button" disabled aria-controls="history-panel" aria-expanded="false">
+        <span class="icon" aria-hidden="true">🕘</span><span>Ιστορικό θέσεων</span><span class="tile-count" id="history-tile-count">0/5</span>
+      </button>
     </div>
+    <button id="retry" class="retry" type="button">↻ Επανάληψη εύρεσης οδού</button>
 
-    <details class="parking-history" id="history-panel" hidden>
-      <summary class="parking-history-toggle"><span>🕘 Ιστορικό θέσεων</span><span class="parking-history-count" id="history-count">0/5</span></summary>
+    <section class="parking-history is-collapsed" id="history-panel" aria-label="Ιστορικό θέσεων" hidden>
+      <div class="parking-history-title"><h2>Ιστορικό θέσεων</h2><span class="parking-history-count" id="history-count">0/5</span></div>
       <p class="parking-history-hint">Οι 5 τελευταίες αποθηκευμένες θέσεις σε αυτή τη συσκευή.</p>
       <div class="parking-history-list" id="history-list"></div>
-    </details>
+    </section>
 
     <div class="capture-status" id="capture-status" role="status" aria-live="polite"></div>
     <div class="message" id="message" role="status" aria-live="polite"></div>
@@ -279,7 +341,7 @@
     const KEY='parking.saved.v1';
     const HISTORY_KEY='parking.history.v1', HISTORY_LIMIT=5;
     const $=id=>document.getElementById(id);
-    let saved=null, history=[], lookingUp=false;
+    let saved=null, history=[], lookingUp=false, historyExpanded=false;
     function validPosition(v){
       return v && typeof v==='object' && Number.isFinite(v.lat) && Number.isFinite(v.lon)
         && Math.abs(v.lat)<=90 && Math.abs(v.lon)<=180 && Number.isFinite(v.timestamp)
@@ -332,7 +394,11 @@
     function renderHistory(){
       const panel=$('history-panel'),list=$('history-list');
       panel.hidden=history.length===0;
+      panel.classList.toggle('is-collapsed',!historyExpanded);
       $('history-count').textContent=history.length+'/'+HISTORY_LIMIT;
+      $('history-tile-count').textContent=history.length+'/'+HISTORY_LIMIT;
+      $('history-toggle').disabled=history.length===0;
+      $('history-toggle').setAttribute?.('aria-expanded',String(historyExpanded&&history.length>0));
       list.replaceChildren();
       for(const record of history){
         const card=document.createElement('article');
@@ -569,6 +635,13 @@
       }catch(error){
         if(stop()) $('capture-status').textContent='Δεν ήταν δυνατή η λήψη GPS.';
       }
+    });
+
+    $('history-toggle').addEventListener('click',()=>{
+      if(!history.length)return;
+      historyExpanded=!historyExpanded;
+      renderHistory();
+      if(historyExpanded)$('history-panel').scrollIntoView?.({behavior:'smooth',block:'nearest'});
     });
 
     $('map').addEventListener('click',()=>{
