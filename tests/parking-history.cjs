@@ -152,5 +152,15 @@ const sw=fs.readFileSync(path.join(__dirname,'..','sw.js'),'utf8');
 new vm.Script(sw,{filename:'sw.js'});
 assert.ok(sw.includes('parking-shell-')&&sw.includes('key.startsWith(PREFIX)'),
   'Cache cleanup must not touch other Applications projects');
-assert.ok(sw.includes('v16'),'New history app-shell version must be cached');
-console.log('PASS Parking: empty state, legacy migration, 5-pin rotation, map/navigation, reload, failure rollback, XSS-safe text, isolated cache');
+assert.ok(sw.includes('v17'),'New mobile-update app-shell version must be cached');
+const release=JSON.parse(fs.readFileSync(path.join(__dirname,'..','version.json'),'utf8'));
+assert.equal(release.build,'parking-v17','Release marker tracks the latest published build');
+assert.ok(html.includes("const APP_BUILD='parking-v17'"),'App version matches release marker');
+assert.ok(html.includes("register('./sw.js',{updateViaCache:'none'})"),'Worker code checks without HTTP cache');
+assert.ok(html.includes("visibilitychange")&&html.includes("pageshow"),'Mobile resume triggers update checks');
+assert.ok(html.includes("sessionStorage.getItem('parking.reloadedForBuild')"),'Refresh guard prevents update loops');
+assert.ok(html.includes("setTimeout(checkPendingBuild,300)"),'Do not interrupt GPS position saving');
+assert.ok(sw.includes('new URL("./version.json",scope).pathname'),'Release checks bypass worker cache');
+assert.ok(sw.includes('fetch(request,{cache:"no-store"})'),'Navigation checks bypass stale HTTP cache');
+assert.ok(!/localStorage\.clear\s*\(/.test(html)&&!/localStorage\.removeItem\s*\(\s*KEY\s*\)/.test(html),'Updates never clear saved positions');
+console.log('PASS Parking: empty state, legacy migration, 5-pin rotation, map/navigation, reload, failure rollback, XSS-safe text, isolated cache and mobile release-check');
