@@ -594,7 +594,7 @@
         bigProgress.hidden=true;
         $('progress-block').classList.add('idle');
         progressLabel.textContent='';
-        checkPendingBuild();
+        setTimeout(checkPendingBuild,300);
         return true;
       }
 
