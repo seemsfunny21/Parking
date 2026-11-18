@@ -152,7 +152,7 @@ const sw=fs.readFileSync(path.join(__dirname,'..','sw.js'),'utf8');
 new vm.Script(sw,{filename:'sw.js'});
 assert.ok(sw.includes('parking-shell-')&&sw.includes('key.startsWith(PREFIX)'),
   'Cache cleanup must not touch other Applications projects');
-assert.ok(sw.includes('v18-wide-desktop'),'Desktop visual update is cached while existing saved pins remain untouched');
+assert.ok(sw.includes('v19-classic-layout'),'Restored classic layout is cached while saved pins remain untouched');
 const release=JSON.parse(fs.readFileSync(path.join(__dirname,'..','version.json'),'utf8'));
 assert.equal(release.build,'parking-v17','Release marker tracks the latest published build');
 assert.ok(html.includes("const APP_BUILD='parking-v17'"),'App version matches release marker');
