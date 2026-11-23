@@ -440,6 +440,11 @@ body{padding-bottom:10px!important}
       });
       window.addEventListener('pagehide',stopMapGPS);
       window.addEventListener('pageshow',()=>{startMapGPS();setTimeout(()=>parkingMap?.invalidateSize(),120);});
+      // Applications may reveal Parking after its iframe was initially hidden.
+      if(typeof ResizeObserver!=='undefined'){
+        const mapResizeObserver=new ResizeObserver(()=>parkingMap.invalidateSize());
+        mapResizeObserver.observe($('parking-map'));
+      }
       setTimeout(()=>parkingMap.invalidateSize(),120);
     }
 
