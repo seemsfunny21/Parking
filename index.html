@@ -279,6 +279,23 @@
 @media(prefers-reduced-motion:reduce){.actions .action-tile{transition:none!important}}
 
 </style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* Compact two-action bar; the original OpenStreetMap street tiles fill the rest. */
+body{padding-bottom:10px!important}
+.app{display:flex;flex-direction:column;min-height:calc(100dvh - 24px)}
+.actions{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.actions .action-tile{min-height:78px;padding:10px 6px}
+.actions .action-tile .icon{font-size:1.6rem}
+.parking-map-shell{position:relative;flex:1;min-height:325px;margin-top:12px;border:1px solid rgba(112,172,249,.4);border-radius:16px;overflow:hidden;background:#10263f}
+#parking-map{height:100%;min-height:325px;width:100%;z-index:0}
+.parking-map-controls{position:absolute;z-index:550;top:10px;right:10px;display:flex;flex-direction:column;gap:8px}
+.parking-map-controls button{width:42px;height:42px;border-radius:11px;font-size:1.35rem;font-weight:800;background:#153d72e8;border:1px solid rgba(145,197,255,.8);box-shadow:0 4px 15px #07162999}
+.parking-map-controls button:disabled{opacity:.45}
+.map-fallback{padding:12px;text-align:center;font-size:13px;color:#c7dfff}
+.leaflet-container{font-family:inherit}
+@media(max-height:650px){.parking-map-shell,#parking-map{min-height:280px}}
+</style>
 </head>
 <body>
   <main class="app">
@@ -313,16 +330,19 @@
       <button id="save" class="action-tile tile-save primary-btn" type="button">
         <span class="primary-main"><span class="icon" aria-hidden="true">📍</span><span id="save-label">Αποθήκευση θέσης</span></span>
       </button>
-      <button id="map" class="action-tile tile-map secondary" type="button" disabled>
-        <span class="icon" aria-hidden="true">🗺️</span><span>Προβολή χάρτη</span>
-      </button>
-      <button id="navigate" class="action-tile tile-navigate secondary" type="button" disabled>
-        <span class="icon" aria-hidden="true">➤</span><span>Πλοήγηση</span>
-      </button>
+      
       <button id="history-toggle" class="action-tile tile-history secondary" type="button" disabled aria-controls="history-panel" aria-expanded="false">
         <span class="icon" aria-hidden="true">🕘</span><span>Ιστορικό θέσεων</span><span class="tile-count" id="history-tile-count">0/5</span>
       </button>
     </div>
+    <section class="parking-map-shell" aria-label="Ζωντανός χάρτης OpenStreetMap">
+      <div id="parking-map" role="region" aria-label="Η θέση του αυτοκινήτου και η τρέχουσα θέση μου"></div>
+      <div class="parking-map-controls">
+        <button id="map-follow" type="button" title="Εμφάνιση της θέσης μου" aria-label="Εμφάνιση της θέσης μου">⌖</button>
+        <button id="map-route" type="button" title="Πλοήγηση στο αυτοκίνητο" aria-label="Πλοήγηση στο αυτοκίνητο">➤</button>
+      </div>
+      <div id="map-fallback" class="map-fallback" hidden>Ο χάρτης χρειάζεται σύνδεση στο διαδίκτυο.</div>
+    </section>
     <button id="retry" class="retry" type="button">↻ Επανάληψη εύρεσης οδού</button>
 
     <section class="parking-history is-collapsed" id="history-panel" aria-label="Ιστορικό θέσεων" hidden>
@@ -335,14 +355,94 @@
     <div class="message" id="message" role="status" aria-live="polite"></div>
   </main>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
   (()=>{
     'use strict';
-    const APP_BUILD='parking-v19';
+    const APP_BUILD='parking-v20';
     const KEY='parking.saved.v1';
     const HISTORY_KEY='parking.history.v1', HISTORY_LIMIT=5;
     const $=id=>document.getElementById(id);
     let saved=null, history=[], lookingUp=false, historyExpanded=false;
+
+    let parkingMap=null, carMarker=null, myMarker=null, accuracyCircle=null;
+    let myLocation=null, gpsWatchId=null, gpsFirstFix=true;
+    function centerParkingMap(includeBoth=true){
+      if(!parkingMap)return;
+      if(includeBoth && saved && myLocation){
+        parkingMap.fitBounds(L.latLngBounds([[saved.lat,saved.lon],[myLocation.lat,myLocation.lon]]).pad(.3),{maxZoom:17});
+      }else if(myLocation){
+        parkingMap.setView([myLocation.lat,myLocation.lon],17);
+      }else if(saved){
+        parkingMap.setView([saved.lat,saved.lon],17);
+      }
+    }
+    function refreshParkingMap(){
+      if(!parkingMap)return;
+      if(saved){
+        const p=[saved.lat,saved.lon];
+        if(!carMarker)carMarker=L.marker(p,{title:'Σταθμευμένο αυτοκίνητο'}).addTo(parkingMap).bindPopup('🚗 Σταθμευμένο αυτοκίνητο');
+        else carMarker.setLatLng(p);
+      }else if(carMarker){
+        parkingMap.removeLayer(carMarker);carMarker=null;
+      }
+    }
+    function stopMapGPS(){
+      if(gpsWatchId!==null && navigator.geolocation){
+        navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null;
+      }
+    }
+    function startMapGPS(){
+      if(gpsWatchId!==null||!navigator.geolocation||!parkingMap)return;
+      try{
+        gpsWatchId=navigator.geolocation.watchPosition(pos=>{
+          const c=pos.coords;
+          if(!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude))return;
+          myLocation={lat:c.latitude,lon:c.longitude};
+          const point=[c.latitude,c.longitude];
+          if(!myMarker){
+            myMarker=L.circleMarker(point,{radius:8,color:'#fff',weight:3,fillColor:'#238fff',fillOpacity:1})
+              .addTo(parkingMap).bindPopup('Η θέση μου');
+          }else myMarker.setLatLng(point);
+          if(!accuracyCircle){
+            accuracyCircle=L.circle(point,{radius:Math.max(1,c.accuracy||1),stroke:false,fillColor:'#238fff',fillOpacity:.16,interactive:false}).addTo(parkingMap);
+          }else accuracyCircle.setLatLng(point).setRadius(Math.max(1,c.accuracy||1));
+          if(gpsFirstFix){centerParkingMap(true);gpsFirstFix=false;}
+        },err=>{
+          if(err.code===1){$('map-follow').title='Επέτρεψε την τοποθεσία από τον browser';stopMapGPS();}
+        },{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+      }catch(_){}
+    }
+    function initParkingMap(){
+      if(typeof L==='undefined'){$('map-fallback').hidden=false;return;}
+      const initial=saved?[saved.lat,saved.lon]:[39.665,20.853];
+      parkingMap=L.map('parking-map',{zoomControl:true}).setView(initial,saved?17:13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        maxZoom:19,attribution:'© OpenStreetMap contributors'
+      }).addTo(parkingMap);
+      refreshParkingMap();
+      $('map-route').disabled=!saved;
+      $('map-follow').addEventListener('click',()=>{
+        if(myLocation)centerParkingMap(false);
+        else if(navigator.geolocation){
+          navigator.geolocation.getCurrentPosition(p=>{
+            myLocation={lat:p.coords.latitude,lon:p.coords.longitude};
+            centerParkingMap(false);
+            startMapGPS();
+          },()=>{}, {enableHighAccuracy:true,timeout:15000});
+        }
+      });
+      $('map-route').addEventListener('click',()=>{if(saved)navigateTo(saved);});
+      startMapGPS();
+      document.addEventListener('visibilitychange',()=>{
+        if(document.hidden)stopMapGPS();
+        else {startMapGPS();setTimeout(()=>parkingMap?.invalidateSize(),120);}
+      });
+      window.addEventListener('pagehide',stopMapGPS);
+      window.addEventListener('pageshow',()=>{startMapGPS();setTimeout(()=>parkingMap?.invalidateSize(),120);});
+      setTimeout(()=>parkingMap.invalidateSize(),120);
+    }
+
     function validPosition(v){
       return v && typeof v==='object' && Number.isFinite(v.lat) && Number.isFinite(v.lon)
         && Math.abs(v.lat)<=90 && Math.abs(v.lon)<=180 && Number.isFinite(v.timestamp)
@@ -490,7 +590,8 @@
     }
 
     function render(){
-      $('map').disabled = $('navigate').disabled = !saved;
+      $('map-route').disabled = !saved;
+      refreshParkingMap();
       const unresolved = !!saved && !saved.address;
       $('retry').classList.toggle('show', !!saved && saved.addressLookedUp && unresolved);
       $('retry').disabled = lookingUp;
@@ -540,6 +641,7 @@
     }
 
     render();
+    initParkingMap();
     if(saved && !saved.addressLookedUp) resolveAddress(saved);
 
     $('retry').addEventListener('click',()=>{
@@ -607,6 +709,8 @@
         const value={lat:best.lat,lon:best.lon,accuracy:best.accuracy,timestamp:Date.now(),address:'',addressLookedUp:false};
         try{
           persistNewPosition(value);
+          refreshParkingMap();
+          centerParkingMap(true);
           render();
           $('capture-status').textContent='✓ Αποθηκεύτηκε — μπορείς να κλειδώσεις.';
           resolveAddress(value);
@@ -646,15 +750,6 @@
       if(historyExpanded)$('history-panel').scrollIntoView?.({behavior:'smooth',block:'nearest'});
     });
 
-    $('map').addEventListener('click',()=>{
-      if(!saved) return;
-      showMap(saved);
-    });
-
-    $('navigate').addEventListener('click',()=>{
-      if(!saved) return;
-      navigateTo(saved);
-    });
 
     /* Mobile PWA updates: detect a newer build when opening or resuming the app.
        Refresh only the app shell; never clear localStorage or saved parking pins. */
