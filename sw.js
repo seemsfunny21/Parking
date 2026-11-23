@@ -1,6 +1,6 @@
 /* Parking PWA: isolated offline cache. Other apps share this origin. */
 const PREFIX = "parking-shell-";
-const CACHE = PREFIX + "v19-classic-layout";
+const CACHE = PREFIX + "v20-inline-osm-map";
 const FILES = ["./","./index.html","./manifest.webmanifest","./icon.svg","./hero-banner.webp"];
 
 self.addEventListener("install",event=>{
