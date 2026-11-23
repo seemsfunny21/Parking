@@ -279,17 +279,7 @@
 @media(prefers-reduced-motion:reduce){.actions .action-tile{transition:none!important}}
 
 </style>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoS3aFQ9GQm5B4=" crossorigin="">
-<style>
-.actions{grid-template-columns:repeat(2,minmax(0,1fr))}
-.actions .action-tile{min-height:70px}
-.live-map-shell{margin-top:12px;border:1px solid rgba(112,172,249,.39);border-radius:17px;overflow:hidden;background:#102b48;position:relative}
-#live-map{height:max(310px,calc(100dvh - 480px));min-height:310px;width:100%;z-index:0}
-.map-overlay{position:absolute;bottom:12px;left:10px;right:10px;z-index:500;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
-.map-overlay button{pointer-events:auto;width:auto;min-height:40px;padding:8px 12px;border-radius:12px;background:#123b71e8;border:1px solid #7ab8f4;font-size:13px;font-weight:750}
-.map-hint{font-size:12px;color:#b9d8fb;text-align:center;padding:10px}
-.leaflet-container{font-family:inherit}
-</style></head>
+</head>
 <body>
   <main class="app">
     <header class="hero" aria-label="Parking">
@@ -323,11 +313,16 @@
       <button id="save" class="action-tile tile-save primary-btn" type="button">
         <span class="primary-main"><span class="icon" aria-hidden="true">📍</span><span id="save-label">Αποθήκευση θέσης</span></span>
       </button>
+      <button id="map" class="action-tile tile-map secondary" type="button" disabled>
+        <span class="icon" aria-hidden="true">🗺️</span><span>Προβολή χάρτη</span>
+      </button>
+      <button id="navigate" class="action-tile tile-navigate secondary" type="button" disabled>
+        <span class="icon" aria-hidden="true">➤</span><span>Πλοήγηση</span>
+      </button>
       <button id="history-toggle" class="action-tile tile-history secondary" type="button" disabled aria-controls="history-panel" aria-expanded="false">
         <span class="icon" aria-hidden="true">🕘</span><span>Ιστορικό θέσεων</span><span class="tile-count" id="history-tile-count">0/5</span>
       </button>
     </div>
-    <section class="live-map-shell" aria-label="Ζωντανός χάρτης πάρκινγκ"><div id="live-map"></div><div id="map-hint" class="map-hint" hidden>Ο χάρτης χρειάζεται σύνδεση στο διαδίκτυο.</div><div class="map-overlay"><button id="locate-me" type="button">◎ Η θέση μου</button><button id="route-to-car" type="button">➤ Διαδρομή</button></div></section>
     <button id="retry" class="retry" type="button">↻ Επανάληψη εύρεσης οδού</button>
 
     <section class="parking-history is-collapsed" id="history-panel" aria-label="Ιστορικό θέσεων" hidden>
@@ -340,54 +335,14 @@
     <div class="message" id="message" role="status" aria-live="polite"></div>
   </main>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
   (()=>{
     'use strict';
-    const APP_BUILD='parking-v18';
+    const APP_BUILD='parking-v19';
     const KEY='parking.saved.v1';
     const HISTORY_KEY='parking.history.v1', HISTORY_LIMIT=5;
     const $=id=>document.getElementById(id);
     let saved=null, history=[], lookingUp=false, historyExpanded=false;
-    let liveMap=null,carMarker=null,userMarker=null,userAccuracy=null,geoWatch=null,lastUserPosition=null,mapFitted=false;
-    function refreshMap(){
-      if(!liveMap)return;
-      if(saved){
-        const point=[saved.lat,saved.lon];
-        if(!carMarker)carMarker=L.marker(point).addTo(liveMap).bindPopup('🚗 Αποθηκευμένο πάρκινγκ');
-        else carMarker.setLatLng(point);
-        if(!mapFitted){liveMap.setView(point,17);mapFitted=true;}
-      }else if(carMarker){liveMap.removeLayer(carMarker);carMarker=null;}
-      if(saved&&lastUserPosition&&mapFitted){
-        // Keep both markers visible on initial fix, without repeatedly overriding manual panning.
-        if(!liveMap._shownBoth){liveMap.fitBounds(L.latLngBounds([saved.lat,saved.lon],[lastUserPosition.lat,lastUserPosition.lon]).pad(.3),{maxZoom:17});liveMap._shownBoth=true;}
-      }
-    }
-    function initMap(){
-      if(typeof L==='undefined'){$('map-hint').hidden=false;return;}
-      liveMap=L.map('live-map',{zoomControl:true}).setView([39.665,20.853],13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(liveMap);
-      refreshMap();
-      if(!navigator.geolocation){$('locate-me').textContent='GPS μη διαθέσιμο';return;}
-      geoWatch=navigator.geolocation.watchPosition(pos=>{
-        const c=pos.coords;lastUserPosition={lat:c.latitude,lon:c.longitude};
-        const ll=[c.latitude,c.longitude];
-        if(!userMarker)userMarker=L.circleMarker(ll,{radius:8,color:'#fff',weight:3,fillColor:'#218cff',fillOpacity:1}).addTo(liveMap).bindPopup('Η θέση μου');
-        else userMarker.setLatLng(ll);
-        if(userAccuracy)liveMap.removeLayer(userAccuracy);
-        userAccuracy=L.circle(ll,{radius:Math.max(1,c.accuracy||1),stroke:false,fillColor:'#238bff',fillOpacity:.12,interactive:false}).addTo(liveMap);
-        if(!saved&&!mapFitted){liveMap.setView(ll,17);mapFitted=true;}
-        refreshMap();
-      },()=>{$('locate-me').textContent='◎ Ενεργοποίηση GPS';},{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
-      document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>liveMap?.invalidateSize(),150);});
-      $('locate-me').addEventListener('click',()=>{
-        if(lastUserPosition)liveMap.setView([lastUserPosition.lat,lastUserPosition.lon],17);
-        else navigator.geolocation.getCurrentPosition(p=>liveMap.setView([p.coords.latitude,p.coords.longitude],17),()=>{$('locate-me').textContent='Άδεια GPS απαιτείται';},{enableHighAccuracy:true});
-      });
-      $('route-to-car').addEventListener('click',()=>{if(saved)navigateTo(saved);});
-      setTimeout(()=>liveMap.invalidateSize(),250);
-    }
-
     function validPosition(v){
       return v && typeof v==='object' && Number.isFinite(v.lat) && Number.isFinite(v.lon)
         && Math.abs(v.lat)<=90 && Math.abs(v.lon)<=180 && Number.isFinite(v.timestamp)
@@ -535,8 +490,7 @@
     }
 
     function render(){
-      $('route-to-car').disabled = !saved;
-      refreshMap();
+      $('map').disabled = $('navigate').disabled = !saved;
       const unresolved = !!saved && !saved.address;
       $('retry').classList.toggle('show', !!saved && saved.addressLookedUp && unresolved);
       $('retry').disabled = lookingUp;
@@ -586,7 +540,6 @@
     }
 
     render();
-    initMap();
     if(saved && !saved.addressLookedUp) resolveAddress(saved);
 
     $('retry').addEventListener('click',()=>{
@@ -654,7 +607,6 @@
         const value={lat:best.lat,lon:best.lon,accuracy:best.accuracy,timestamp:Date.now(),address:'',addressLookedUp:false};
         try{
           persistNewPosition(value);
-          if(liveMap)liveMap._shownBoth=false;
           render();
           $('capture-status').textContent='✓ Αποθηκεύτηκε — μπορείς να κλειδώσεις.';
           resolveAddress(value);
@@ -694,6 +646,15 @@
       if(historyExpanded)$('history-panel').scrollIntoView?.({behavior:'smooth',block:'nearest'});
     });
 
+    $('map').addEventListener('click',()=>{
+      if(!saved) return;
+      showMap(saved);
+    });
+
+    $('navigate').addEventListener('click',()=>{
+      if(!saved) return;
+      navigateTo(saved);
+    });
 
     /* Mobile PWA updates: detect a newer build when opening or resuming the app.
        Refresh only the app shell; never clear localStorage or saved parking pins. */
