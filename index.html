@@ -292,6 +292,14 @@ body{padding-bottom:10px!important}
 .parking-map-controls{position:absolute;z-index:550;top:10px;right:10px;display:flex;flex-direction:column;gap:8px}
 .parking-map-controls button{width:42px;height:42px;border-radius:11px;font-size:1.35rem;font-weight:800;background:#153d72e8;border:1px solid rgba(145,197,255,.8);box-shadow:0 4px 15px #07162999}
 .parking-map-controls button:disabled{opacity:.45}
+.parking-map-shell.dark-map{background:#0b1726}
+.parking-map-shell.dark-map .leaflet-tile-pane .leaflet-tile{
+  filter:invert(1) hue-rotate(180deg) brightness(.79) contrast(.88) saturate(.65);
+}
+.parking-map-shell.dark-map .leaflet-control-zoom a{background:#193657;color:#f1f7ff;border-color:#3b5673}
+.parking-map-shell.dark-map .leaflet-control-attribution{background:rgba(8,20,35,.83);color:#d4e5f8}
+.parking-map-shell.dark-map .leaflet-control-attribution a{color:#a8ceff}
+.parking-map-shell.dark-map .leaflet-popup-content-wrapper,.parking-map-shell.dark-map .leaflet-popup-tip{background:#173252;color:#eef6ff}
 .map-fallback{padding:12px;text-align:center;font-size:13px;color:#c7dfff}
 .leaflet-container{font-family:inherit}
 @media(max-height:650px){.parking-map-shell,#parking-map{min-height:280px}}
@@ -335,9 +343,10 @@ body{padding-bottom:10px!important}
         <span class="icon" aria-hidden="true">🕘</span><span>Ιστορικό θέσεων</span><span class="tile-count" id="history-tile-count">0/5</span>
       </button>
     </div>
-    <section class="parking-map-shell" aria-label="Ζωντανός χάρτης OpenStreetMap">
+    <section class="parking-map-shell dark-map" aria-label="Ζωντανός χάρτης OpenStreetMap">
       <div id="parking-map" role="region" aria-label="Η θέση του αυτοκινήτου και η τρέχουσα θέση μου"></div>
       <div class="parking-map-controls">
+        <button id="map-theme" type="button" title="Εναλλαγή σκοτεινού/φωτεινού χάρτη" aria-label="Εναλλαγή σκοτεινού/φωτεινού χάρτη" aria-pressed="true">☀</button>
         <button id="map-follow" type="button" title="Εμφάνιση της θέσης μου" aria-label="Εμφάνιση της θέσης μου">⌖</button>
         <button id="map-route" type="button" title="Πλοήγηση στο αυτοκίνητο" aria-label="Πλοήγηση στο αυτοκίνητο">➤</button>
       </div>
@@ -359,7 +368,7 @@ body{padding-bottom:10px!important}
   <script>
   (()=>{
     'use strict';
-    const APP_BUILD='parking-v20';
+    const APP_BUILD='parking-v21';
     const KEY='parking.saved.v1';
     const HISTORY_KEY='parking.history.v1', HISTORY_LIMIT=5;
     const $=id=>document.getElementById(id);
@@ -414,6 +423,25 @@ body{padding-bottom:10px!important}
       }catch(_){}
     }
     function initParkingMap(){
+      const themeKey='parking.map.theme.v1';
+      let theme='dark';
+      try{if(localStorage.getItem(themeKey)==='light')theme='light';}catch(_){}
+      const themeButton=$('map-theme');
+      const themeShell=document.querySelector('.parking-map-shell');
+      function paintMapTheme(){
+        const dark=theme==='dark';
+        themeShell.classList.toggle('dark-map',dark);
+        themeButton.textContent=dark?'☀':'☾';
+        themeButton.setAttribute('aria-pressed',String(dark));
+        themeButton.title=dark?'Φωτεινός χάρτης':'Σκοτεινός χάρτης';
+        themeButton.setAttribute('aria-label',themeButton.title);
+      }
+      paintMapTheme();
+      themeButton.addEventListener('click',()=>{
+        theme=theme==='dark'?'light':'dark';
+        try{localStorage.setItem(themeKey,theme);}catch(_){}
+        paintMapTheme();
+      });
       if(typeof L==='undefined'){$('map-fallback').hidden=false;return;}
       const initial=saved?[saved.lat,saved.lon]:[39.665,20.853];
       parkingMap=L.map('parking-map',{zoomControl:true}).setView(initial,saved?17:13);
