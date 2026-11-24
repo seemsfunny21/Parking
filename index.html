@@ -488,7 +488,7 @@ body{padding-bottom:10px!important}
       const out=[];
       for(const item of items){
         if(!validPosition(item)||out.some(x=>sameRecord(x,item)))continue;
-        out.push(item);
+        out.push({...item,address:typeof item.address==='string'?item.address:'',addressLookedUp:typeof item.address==='string'&&item.addressLookedUp===true});
         if(out.length===HISTORY_LIMIT)break;
       }
       return out;
@@ -504,7 +504,7 @@ body{padding-bottom:10px!important}
       if(raw){
         const v=JSON.parse(raw);
         if(validPosition(v)){
-          saved=v;
+          saved={...v,address:typeof v.address==='string'?v.address:'',addressLookedUp:typeof v.address==='string'&&v.addressLookedUp===true};
           // Automatically include a previously saved pin when upgrading.
           history=uniqueHistory([saved,...history]);
         }
@@ -549,7 +549,7 @@ body{padding-bottom:10px!important}
         }
         const place=document.createElement('div');
         place.className='parking-history-place';
-        place.textContent=record.address?.replace(/^(Πιθανή οδός:|Κοντά:)\s*/,'') || 'Αποθηκευμένη θέση';
+        place.textContent=(typeof record.address==='string'?record.address:'').replace(/^(Πιθανή οδός:|Κοντά:)\s*/,'') || 'Αποθηκευμένη θέση';
         const coords=document.createElement('div');
         coords.className='parking-history-coords';coords.textContent=formatCoordinates(record);
         const actions=document.createElement('div');
@@ -633,7 +633,7 @@ body{padding-bottom:10px!important}
 
       if(saved){
         $('status').textContent='Αποθηκευμένη θέση';
-        $('position').textContent = saved.address?.replace(/^(Πιθανή οδός:|Κοντά:)\s*/, '') || (lookingUp ? 'Εύρεση οδού…' : (saved.addressLookedUp ? 'Άγνωστη οδός' : 'Η θέση έχει αποθηκευτεί'));
+        $('position').textContent = (typeof saved.address==='string'?saved.address:'').replace(/^(Πιθανή οδός:|Κοντά:)\s*/, '') || (lookingUp ? 'Εύρεση οδού…' : (saved.addressLookedUp ? 'Άγνωστη οδός' : 'Η θέση έχει αποθηκευτεί'));
         $('date').textContent = formatDate(saved.timestamp);
       }else{
         $('status').textContent='Δεν υπάρχει αποθηκευμένη θέση';
