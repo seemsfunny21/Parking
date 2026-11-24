@@ -1,6 +1,6 @@
 /* Parking PWA: isolated offline cache. Other apps share this origin. */
 const PREFIX = "parking-shell-";
-const CACHE = PREFIX + "v21-night-map";
+const CACHE = PREFIX + "v22-stress-fixes";
 const FILES = ["./","./index.html","./manifest.webmanifest","./icon.svg","./hero-banner.webp"];
 
 self.addEventListener("install",event=>{
@@ -35,7 +35,7 @@ self.addEventListener("fetch",event=>{
       try{
         // Installed mobile browsers can otherwise reuse an old HTTP-cached HTML.
         const response=await fetch(request,{cache:"no-store"});
-        if(response.ok)await cache.put("./index.html",response.clone());
+        if(response.ok){try{await cache.put("./index.html",response.clone());}catch(_){/* Keep the successful network response. */}}
         return response;
       }catch{
         return await cache.match("./index.html") ||
