@@ -292,6 +292,9 @@ body{padding-bottom:10px!important}
 .parking-map-controls{position:absolute;z-index:550;top:10px;right:10px;display:flex;flex-direction:column;gap:8px}
 .parking-map-controls button{width:42px;height:42px;border-radius:11px;font-size:1.35rem;font-weight:800;background:#153d72e8;border:1px solid rgba(145,197,255,.8);box-shadow:0 4px 15px #07162999}
 .parking-map-controls button:disabled{opacity:.45}
+#map-street{display:grid;place-items:center;color:#ffdd91;padding:0}
+.parking-history-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+.parking-history-actions button{min-width:0;overflow-wrap:anywhere}
 .parking-map-shell.dark-map{background:#0b1726}
 .parking-map-shell.dark-map .leaflet-tile-pane .leaflet-tile{
   filter:invert(1) hue-rotate(180deg) brightness(.79) contrast(.88) saturate(.65);
@@ -349,6 +352,7 @@ body{padding-bottom:10px!important}
         <button id="map-theme" type="button" title="Εναλλαγή σκοτεινού/φωτεινού χάρτη" aria-label="Εναλλαγή σκοτεινού/φωτεινού χάρτη" aria-pressed="true">☀</button>
         <button id="map-follow" type="button" title="Εμφάνιση της θέσης μου" aria-label="Εμφάνιση της θέσης μου">⌖</button>
         <button id="map-route" type="button" title="Πλοήγηση στο αυτοκίνητο" aria-label="Πλοήγηση στο αυτοκίνητο">➤</button>
+        <button id="map-street" type="button" title="Street View αποθηκευμένης θέσης" aria-label="Street View αποθηκευμένης θέσης" disabled><svg aria-hidden="true" width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="2"/><path d="M8 11V9a4 4 0 0 1 8 0v2m-4-3v7m-3 4 3-4 3 4"/><ellipse cx="12" cy="20" rx="8" ry="3"/></svg></button>
       </div>
       <div id="map-fallback" class="map-fallback" hidden>Ο χάρτης χρειάζεται σύνδεση στο διαδίκτυο.</div>
     </section>
@@ -368,7 +372,7 @@ body{padding-bottom:10px!important}
   <script>
   (()=>{
     'use strict';
-    const APP_BUILD='parking-v23';
+    const APP_BUILD='parking-v24';
     const KEY='parking.saved.v1';
     const HISTORY_KEY='parking.history.v1', HISTORY_LIMIT=5;
     const $=id=>document.getElementById(id);
@@ -442,6 +446,7 @@ body{padding-bottom:10px!important}
         try{localStorage.setItem(themeKey,theme);}catch(_){}
         paintMapTheme();
       });
+      $('map-street').addEventListener('click',()=>{if(saved)openStreetView(saved);});
       if(typeof L==='undefined'){$('map-fallback').hidden=false;return;}
       const initial=saved?[saved.lat,saved.lon]:[39.665,20.853];
       parkingMap=L.map('parking-map',{zoomControl:true}).setView(initial,saved?17:13);
@@ -519,6 +524,10 @@ body{padding-bottom:10px!important}
     function showMap(record){
       window.open('https://www.openstreetmap.org/?mlat='+encodeURIComponent(record.lat)+'&mlon='+encodeURIComponent(record.lon)+'#map=18/'+record.lat+'/'+record.lon,'_blank','noopener,noreferrer');
     }
+    function openStreetView(record){
+      if(!validPosition(record))return;
+      window.open('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+encodeURIComponent(record.lat+','+record.lon),'_blank','noopener,noreferrer');
+    }
     function navigateTo(record){
       window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(record.lat+','+record.lon),'_blank','noopener,noreferrer');
     }
@@ -557,7 +566,10 @@ body{padding-bottom:10px!important}
         const nav=document.createElement('button');
         nav.type='button';nav.textContent='➤ Πλοήγηση';
         nav.addEventListener('click',()=>navigateTo(record));
-        actions.append(map,nav);
+        const street=document.createElement('button');
+        street.type='button';street.textContent='Street View';
+        street.addEventListener('click',()=>openStreetView(record));
+        actions.append(map,nav,street);
         card.append(head,place,coords,actions);
         list.appendChild(card);
       }
@@ -623,6 +635,7 @@ body{padding-bottom:10px!important}
 
     function render(){
       $('map-route').disabled = !saved;
+      $('map-street').disabled = !saved;
       refreshParkingMap();
       const unresolved = !!saved && !saved.address;
       $('retry').classList.toggle('show', !!saved && saved.addressLookedUp && unresolved);
