@@ -301,6 +301,19 @@ body{padding-bottom:10px!important}
 .parking-map-shell.dark-map .leaflet-control-attribution a{color:#a8ceff}
 .parking-map-shell.dark-map .leaflet-popup-content-wrapper,.parking-map-shell.dark-map .leaflet-popup-tip{background:#173252;color:#eef6ff}
 .map-fallback{padding:12px;text-align:center;font-size:13px;color:#c7dfff}
+.street-panel{flex:none;margin-top:12px;border:1px solid rgba(112,172,249,.4);border-radius:16px;overflow:hidden;background:#10263f}
+.street-panel[hidden],.street-panel [hidden]{display:none!important}
+.street-panel h2{margin:0;padding:10px 12px;font-size:14px;color:#e3efff;text-align:center}
+.street-panel iframe{display:block;width:100%;height:280px;border:0;background:#0b1726}
+.street-status{padding:12px;color:#c7dfff;font-size:12px;text-align:center}
+.street-open{display:block;text-align:center;margin:0 12px 10px;padding:9px;color:#dbeeff;font-weight:700;text-decoration:none;border:1px solid #406a96;border-radius:10px}
+.street-config{margin:8px 12px 12px;font-size:12px;color:#b9d1ef}
+.street-config summary{cursor:pointer}
+.street-config form{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.street-config input{flex:1;min-width:120px;padding:9px;color:#eef6ff;background:#0b1726;border:1px solid #406a96;border-radius:8px}
+.street-config button{padding:8px;font-size:12px}
+.street-config p{line-height:1.45}
+
 .leaflet-container{font-family:inherit}
 @media(max-height:650px){.parking-map-shell,#parking-map{min-height:280px}}
 </style>
@@ -352,6 +365,18 @@ body{padding-bottom:10px!important}
       </div>
       <div id="map-fallback" class="map-fallback" hidden>Ο χάρτης χρειάζεται σύνδεση στο διαδίκτυο.</div>
     </section>
+    <section class="street-panel" id="street-panel" aria-label="Street View">
+      <h2>Street View</h2>
+      <iframe id="street-frame" title="Street View αποθηκευμένης θέσης" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen hidden></iframe>
+      <div id="street-status" class="street-status" role="status">Αποθήκευσε μία θέση για προβολή Street View.</div>
+      <a id="street-open" class="street-open" target="_blank" rel="noopener noreferrer" hidden>Άνοιγμα στο Google Street View ↗</a>
+      <details class="street-config" id="street-config">
+        <summary>Ρύθμιση ενσωματωμένου Street View</summary>
+        <p>Χρειάζεται κλειδί Google Maps Embed API, περιορισμένο στο seemsfunny21.github.io.</p>
+        <form id="street-form"><input id="street-key" type="password" placeholder="Maps Embed API key" aria-label="Κλειδί Maps Embed API" autocomplete="off" spellcheck="false"><button type="submit">Αποθήκευση</button><button type="button" id="street-clear">Αφαίρεση</button></form>
+        <small id="street-config-status" role="status"></small>
+      </details>
+    </section>
     <button id="retry" class="retry" type="button">↻ Επανάληψη εύρεσης οδού</button>
 
     <section class="parking-history is-collapsed" id="history-panel" aria-label="Ιστορικό θέσεων" hidden>
@@ -390,15 +415,8 @@ body{padding-bottom:10px!important}
       if(!parkingMap)return;
       if(saved){
         const p=[saved.lat,saved.lon];
-        if(!carMarker){
-          const popup=document.createElement('div');
-          const label=document.createElement('div');label.textContent='🚗 Σταθμευμένο αυτοκίνητο';
-          const street=document.createElement('button');street.type='button';street.textContent='Street View';
-          street.style.cssText='display:block;margin:8px auto 0;padding:5px 10px;cursor:pointer;font:inherit;';
-          street.addEventListener('click',()=>{if(saved)openStreetView(saved);});
-          popup.append(label,street);
-          carMarker=L.marker(p,{title:'Σταθμευμένο αυτοκίνητο'}).addTo(parkingMap).bindPopup(popup);
-        }else carMarker.setLatLng(p);
+        if(!carMarker)carMarker=L.marker(p,{title:'Σταθμευμένο αυτοκίνητο'}).addTo(parkingMap).bindPopup('🚗 Σταθμευμένο αυτοκίνητο');
+        else carMarker.setLatLng(p);
       }else if(carMarker){
         parkingMap.removeLayer(carMarker);carMarker=null;
       }
@@ -526,10 +544,35 @@ body{padding-bottom:10px!important}
     function showMap(record){
       window.open('https://www.openstreetmap.org/?mlat='+encodeURIComponent(record.lat)+'&mlon='+encodeURIComponent(record.lon)+'#map=18/'+record.lat+'/'+record.lon,'_blank','noopener,noreferrer');
     }
-    function openStreetView(record){
-      if(!validPosition(record))return;
-      window.open('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+encodeURIComponent(record.lat+','+record.lon),'_blank','noopener,noreferrer');
+    const STREET_KEY='parking.street.embedKey.v1';
+    function streetKey(){try{return localStorage.getItem(STREET_KEY)||'';}catch(_){return '';}}
+    function streetUrls(record,key){
+      if(!validPosition(record))return null;
+      const coords=encodeURIComponent(record.lat+','+record.lon);
+      return {open:'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+coords,
+        embed:key?'https://www.google.com/maps/embed/v1/streetview?key='+encodeURIComponent(key)+'&location='+coords:null};
     }
+    function renderStreet(){
+      const frame=$('street-frame'),status=$('street-status'),link=$('street-open'),key=streetKey();
+      const urls=streetUrls(saved,key),active=!!(urls?.embed&&navigator.onLine);
+      link.hidden=!urls;
+      if(urls)link.href=urls.open;else link.removeAttribute('href');
+      frame.hidden=!active;status.hidden=active;
+      if(active){if(frame.getAttribute('src')!==urls.embed)frame.setAttribute('src',urls.embed);}
+      else{
+        if(frame.hasAttribute('src'))frame.removeAttribute('src');
+        status.textContent=!urls?'Αποθήκευσε μία θέση για προβολή Street View.':!navigator.onLine?'Η προβολή χρειάζεται Internet.':'Για προβολή εδώ, ενεργοποίησε το Maps Embed API.';
+      }
+    }
+    $('street-form').addEventListener('submit',event=>{
+      event.preventDefault();const field=$('street-key'),key=field.value.trim();
+      if(!/^[A-Za-z0-9_-]{20,150}$/.test(key)){$('street-config-status').textContent='Μη έγκυρη μορφή κλειδιού.';return;}
+      try{localStorage.setItem(STREET_KEY,key);field.value='';$('street-config-status').textContent='Το κλειδί αποθηκεύτηκε σε αυτή τη συσκευή.';$('street-config').open=false;renderStreet();}
+      catch(_){$('street-config-status').textContent='Αποτυχία αποθήκευσης.';}
+    });
+    $('street-clear').addEventListener('click',()=>{try{localStorage.removeItem(STREET_KEY);$('street-key').value='';$('street-config-status').textContent='Το κλειδί αφαιρέθηκε.';renderStreet();}catch(_){}});
+    window.addEventListener('offline',renderStreet);
+    window.addEventListener('storage',event=>{if(event.key===STREET_KEY)renderStreet();});
     function navigateTo(record){
       window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(record.lat+','+record.lon),'_blank','noopener,noreferrer');
     }
@@ -651,6 +694,7 @@ body{padding-bottom:10px!important}
         $('date').textContent='—';
       }
       renderHistory();
+      renderStreet();
     }
 
     async function resolveAddress(record){
