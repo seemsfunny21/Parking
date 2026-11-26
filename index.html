@@ -368,7 +368,7 @@ body{padding-bottom:10px!important}
   <script>
   (()=>{
     'use strict';
-    const APP_BUILD='parking-v22';
+    const APP_BUILD='parking-v23';
     const KEY='parking.saved.v1';
     const HISTORY_KEY='parking.history.v1', HISTORY_LIMIT=5;
     const $=id=>document.getElementById(id);
@@ -493,23 +493,20 @@ body{padding-bottom:10px!important}
       }
       return out;
     }
-    try{
-      const raw=localStorage.getItem(HISTORY_KEY),items=raw?JSON.parse(raw):[];
-      history=uniqueHistory(Array.isArray(items)?items:[]);
-    }catch(_){history=[];}
-
-
-    try{
-      const raw=localStorage.getItem(KEY);
-      if(raw){
-        const v=JSON.parse(raw);
-        if(validPosition(v)){
-          saved={...v,address:typeof v.address==='string'?v.address:'',addressLookedUp:typeof v.address==='string'&&v.addressLookedUp===true};
-          // Automatically include a previously saved pin when upgrading.
-          history=uniqueHistory([saved,...history]);
-        }
-      }
-    }catch(error){ $('message').textContent='Αδυναμία ανάγνωσης προηγούμενης θέσης.'; }
+    function readStoredPositions(){
+      const rawHistory=localStorage.getItem(HISTORY_KEY);
+      const rawSaved=localStorage.getItem(KEY);
+      let items=[], pin=null;
+      try{const parsed=JSON.parse(rawHistory||'[]');if(Array.isArray(parsed))items=parsed;}catch(_){}
+      try{const parsed=JSON.parse(rawSaved||'null');if(validPosition(parsed))pin=uniqueHistory([parsed])[0];}catch(_){}
+      return {saved:pin,history:uniqueHistory(pin?[pin,...items]:items)};
+    }
+    function syncStoredPositions(){
+      const stored=readStoredPositions();
+      saved=stored.saved;
+      history=stored.history;
+    }
+    try{syncStoredPositions();}catch(_){$('message').textContent='Αδυναμία ανάγνωσης προηγούμενης θέσης.';}
 
     function formatDate(ts){
       return new Intl.DateTimeFormat('el-GR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(ts));
@@ -567,7 +564,9 @@ body{padding-bottom:10px!important}
     }
     function persistNewPosition(value){
       // Save the history first: an unavailable storage quota cannot erase the old pin.
-      const next=uniqueHistory([value,...history]);
+      // Read storage again: another launcher/tab may have saved a newer pin.
+      const stored=readStoredPositions();
+      const next=uniqueHistory([value,...stored.history]);
       const previousRaw=localStorage.getItem(HISTORY_KEY);
       localStorage.setItem(HISTORY_KEY,JSON.stringify(next));
       try{localStorage.setItem(KEY,JSON.stringify(value));}
@@ -660,6 +659,8 @@ body{padding-bottom:10px!important}
         }catch(error){}
       }
       lookingUp=false;
+      // A late reverse-geocoding response must not overwrite a newer pin.
+      try{syncStoredPositions();}catch(_){return;}
       if(stillCurrent(record)){
         saved.address=address;
         saved.addressLookedUp=true;
@@ -676,6 +677,13 @@ body{padding-bottom:10px!important}
     render();
     initParkingMap();
     if(saved && !saved.addressLookedUp) resolveAddress(saved);
+    window.addEventListener('storage',event=>{
+      if(event.key!==KEY&&event.key!==HISTORY_KEY&&event.key!==null)return;
+      try{syncStoredPositions();render();if(saved&&!lookingUp&&!saved.addressLookedUp)resolveAddress(saved);}catch(_){}
+    });
+    window.addEventListener('online',()=>{
+      try{syncStoredPositions();render();if(saved&&!saved.addressLookedUp)resolveAddress(saved);}catch(_){}
+    });
 
     $('retry').addEventListener('click',()=>{
       if(!saved || lookingUp) return;
@@ -759,7 +767,7 @@ body{padding-bottom:10px!important}
             if(finished) return;
             const c=position.coords;
             if(!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude)||Math.abs(c.latitude)>90||Math.abs(c.longitude)>180) return;
-            const accuracy=Number.isFinite(c.accuracy) ? c.accuracy : null;
+            const accuracy=Number.isFinite(c.accuracy) && c.accuracy>=0 ? c.accuracy : null;
             const candidate={lat:c.latitude,lon:c.longitude,accuracy};
             if(!best || (accuracy!==null && (best.accuracy===null || accuracy<best.accuracy))) best=candidate;
             if(accuracy!==null && accuracy<=35) finish();
