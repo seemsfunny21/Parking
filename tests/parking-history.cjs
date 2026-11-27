@@ -25,7 +25,7 @@ class FakeElement{
     this.tagName=tag.toUpperCase();this.id=id;
     this.textContent='';this.className='';this.children=[];
     this.style={};this.disabled=false;this.hidden=false;
-    this.type='';this.listeners={};
+    this.type='';this.listeners={};this.attributes=new Map();
     const classes=new Set();
     this.classList={
       add(...names){names.forEach(x=>classes.add(x));},
@@ -35,6 +35,10 @@ class FakeElement{
         next?classes.add(name):classes.delete(name);return next;}
     };
   }
+  setAttribute(name,value){this.attributes.set(name,String(value));}
+  getAttribute(name){return this.attributes.get(name)??null;}
+  hasAttribute(name){return this.attributes.has(name);}
+  removeAttribute(name){this.attributes.delete(name);}
   addEventListener(event,listener){(this.listeners[event]??=[]).push(listener);}
   appendChild(child){this.children.push(child);return child;}
   append(...children){children.forEach(x=>this.appendChild(x));}
@@ -54,6 +58,7 @@ function createEnvironment(storage,coordinates=[]){
     getElementById:get,
     createElement:tag=>new FakeElement(tag),
     querySelector(selector){
+      if(selector==='.parking-map-shell')return get('parking-map-shell');
       if(selector==='.status-chip')return statusChip;
       if(selector==='.status-chip .check')return check;
       throw Error('Unexpected selector: '+selector);
@@ -72,7 +77,7 @@ function createEnvironment(storage,coordinates=[]){
     }
   };
   class SimulatedDate extends Date{static now(){return ++clock;}}
-  const ctx={document,navigator,window:{open:(url,target,features)=>links.push({url,target,features})},
+  const ctx={document,navigator,window:{addEventListener(){},open:(url,target,features)=>links.push({url,target,features})},
     localStorage:storage,Date:SimulatedDate,Intl,Number,Array,JSON,Math,Error,Set,String,
     encodeURIComponent,isSecureContext:true,performance:{now:()=>0},
     requestAnimationFrame:()=>42,cancelAnimationFrame:()=>{},
@@ -81,14 +86,16 @@ function createEnvironment(storage,coordinates=[]){
   vm.runInNewContext(script,ctx);
   return{get,storage,links,statusChip,check,save(){get('save').click();}};
 }
-assert.equal((html.match(/class="action-tile /g)||[]).length,4,'Four consistent 2x2 action cards exist');
-assert.ok(html.includes('grid-template-columns:repeat(2,minmax(0,1fr))'),'Actions use a 2x2 grid');
+assert.equal((html.match(/class="action-tile /g)||[]).length,2,'Only save and history action cards exist');
+assert.ok(html.includes('grid-template-columns:repeat(2,minmax(0,1fr))'),'Actions use two equal columns');
 const existing=position(0);
 {
   const app=createEnvironment(new FakeStorage());
   assert.equal(app.get('history-panel').hidden,true,'No history before first save');
-  assert.equal(app.get('map').disabled,true);
-  assert.equal(app.get('navigate').disabled,true);
+  assert.equal(app.get('map-route').disabled,true);
+  assert.equal(app.get('map-fallback').hidden,false,'Offline map fallback is visible');
+  assert.equal(app.get('street-open').hidden,true);
+  assert.equal(app.get('street-frame').hidden,true);
 }
 {
   const store=new FakeStorage({[ACTIVE]:JSON.stringify(existing)});
@@ -98,7 +105,7 @@ const existing=position(0);
   assert.equal(app.get('history-list').children.length,1);
   assert.equal(app.get('history-list').children[0].className.includes('is-current'),true);
   assert.equal(app.get('history-toggle').disabled,false,'History tile enabled when pins exist');
-  assert.equal(app.get('history-tile-count').textContent,'1/5','Fourth tile shows the count');
+  assert.equal(app.get('history-tile-count').textContent,'1/5','History tile shows the count');
   assert.equal(app.get('history-panel').classList.contains('is-collapsed'),true,'History starts collapsed');
   app.get('history-toggle').click();
   assert.equal(app.get('history-panel').classList.contains('is-collapsed'),false,'History tile opens the panel');
@@ -126,8 +133,12 @@ const existing=position(0);
   app.get('history-list').children[4].children[3].children[1].click();
   assert.ok(app.links.at(-1).url.includes('destination='+encodeURIComponent(coordinates[1].lat+','+coordinates[1].lon)),
     'Old navigation uses the historic location');
-  app.get('map').click();
-  assert.ok(app.links.at(-1).url.includes('mlat='+coordinates[5].lat),'Primary map still opens the active pin');
+  app.get('history-list').children[0].children[3].children[0].click();
+  assert.ok(app.links.at(-1).url.includes('mlat='+coordinates[5].lat),'Current history entry opens the active pin');
+  assert.equal(app.get('map-route').disabled,false,'Active navigation control enabled');
+  assert.equal(app.get('street-open').hidden,false,'Street View external link available');
+  assert.ok(app.get('street-open').href.includes('viewpoint='+encodeURIComponent(coordinates[5].lat+','+coordinates[5].lon)),'Street View points to latest pin');
+  assert.equal(app.get('street-frame').hidden,true,'Offline embedded Street View is hidden');
   const reopened=createEnvironment(store);
   assert.equal(reopened.get('history-count').textContent,'5/5','History survives a reload');
   assert.equal(reopened.get('history-list').children.length,5);
@@ -152,10 +163,11 @@ const sw=fs.readFileSync(path.join(__dirname,'..','sw.js'),'utf8');
 new vm.Script(sw,{filename:'sw.js'});
 assert.ok(sw.includes('parking-shell-')&&sw.includes('key.startsWith(PREFIX)'),
   'Cache cleanup must not touch other Applications projects');
-assert.ok(sw.includes('v19-classic-layout'),'Restored classic layout is cached while saved pins remain untouched');
+assert.ok(/const CACHE = PREFIX \+ "v\d+-[^\"]+";/.test(sw),'Versioned isolated application cache');
 const release=JSON.parse(fs.readFileSync(path.join(__dirname,'..','version.json'),'utf8'));
-assert.equal(release.build,'parking-v17','Release marker tracks the latest published build');
-assert.ok(html.includes("const APP_BUILD='parking-v17'"),'App version matches release marker');
+assert.match(release.build,/^parking-v\d+$/,'Release marker has a valid version');
+assert.ok(html.includes("const APP_BUILD='"+release.build+"'"),'App version matches release marker');
+assert.ok(sw.includes('"'+release.build.replace('parking-','')+'-'),'Cache version matches release marker');
 assert.ok(html.includes("register('./sw.js',{updateViaCache:'none'})"),'Worker code checks without HTTP cache');
 assert.ok(html.includes("visibilitychange")&&html.includes("pageshow"),'Mobile resume triggers update checks');
 assert.ok(html.includes("sessionStorage.getItem('parking.reloadedForBuild')"),'Refresh guard prevents update loops');
